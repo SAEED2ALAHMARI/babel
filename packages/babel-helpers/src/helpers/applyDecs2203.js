@@ -1,4 +1,5 @@
 /* @minVersion 7.19.0 */
+/* @onlyBabel7 */
 
 /**
  * NOTE: This is an old version of the helper, used for 2022-03 decorators.
@@ -39,7 +40,7 @@ function applyDecs2203Factory() {
     kind,
     isStatic,
     isPrivate,
-    value
+    value,
   ) {
     var kindStr;
 
@@ -72,7 +73,7 @@ function applyDecs2203Factory() {
     if (kind !== 0 /* FIELD */) {
       ctx.addInitializer = createAddInitializerMethod(
         initializers,
-        decoratorFinishedRef
+        decoratorFinishedRef,
       );
     }
 
@@ -120,7 +121,7 @@ function applyDecs2203Factory() {
   function assertNotFinished(decoratorFinishedRef, fnName) {
     if (decoratorFinishedRef.v) {
       throw new Error(
-        "attempted to call " + fnName + " after decoration was finished"
+        "attempted to call " + fnName + " after decoration was finished",
       );
     }
   }
@@ -137,7 +138,7 @@ function applyDecs2203Factory() {
     if (kind === 1 /* ACCESSOR */) {
       if (type !== "object" || value === null) {
         throw new TypeError(
-          "accessor decorators must return an object with get, set, or init properties or void 0"
+          "accessor decorators must return an object with get, set, or init properties or void 0",
         );
       }
       if (value.get !== undefined) {
@@ -159,7 +160,7 @@ function applyDecs2203Factory() {
         hint = "method";
       }
       throw new TypeError(
-        hint + " decorators must return a function or void 0"
+        hint + " decorators must return a function or void 0",
       );
     }
   }
@@ -172,7 +173,7 @@ function applyDecs2203Factory() {
     kind,
     isStatic,
     isPrivate,
-    initializers
+    initializers,
   ) {
     var decs = decInfo[0];
 
@@ -225,7 +226,7 @@ function applyDecs2203Factory() {
         kind,
         isStatic,
         isPrivate,
-        value
+        value,
       );
 
       if (newValue !== void 0) {
@@ -255,7 +256,7 @@ function applyDecs2203Factory() {
           kind,
           isStatic,
           isPrivate,
-          value
+          value,
         );
 
         if (newValue !== void 0) {
@@ -401,7 +402,7 @@ function applyDecs2203Factory() {
         ) {
           throw new Error(
             "Attempted to decorate a public method/accessor that has the same name as a previously decorated public method/accessor. This is not currently supported by the decorators plugin. Property name was: " +
-              name
+              name,
           );
         } else if (!existingKind && kind > 2 /* METHOD */) {
           existingNonFields.set(name, kind);
@@ -418,7 +419,7 @@ function applyDecs2203Factory() {
         kind,
         isStatic,
         isPrivate,
-        initializers
+        initializers,
       );
     }
 
@@ -452,7 +453,7 @@ function applyDecs2203Factory() {
             name: name,
             addInitializer: createAddInitializerMethod(
               initializers,
-              decoratorFinishedRef
+              decoratorFinishedRef,
             ),
           });
         } finally {

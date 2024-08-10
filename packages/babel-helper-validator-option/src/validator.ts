@@ -1,4 +1,4 @@
-import { findSuggestion } from "./find-suggestion";
+import { findSuggestion } from "./find-suggestion.ts";
 
 export class OptionValidator {
   declare descriptor: string;
@@ -15,7 +15,7 @@ export class OptionValidator {
    *   The property values of `TopLevelOptionShape` can be arbitrary
    * @memberof OptionValidator
    */
-  validateTopLevelOptions(options: Object, TopLevelOptionShape: Object): void {
+  validateTopLevelOptions(options: object, TopLevelOptionShape: object): void {
     const validOptionNames = Object.keys(TopLevelOptionShape);
     for (const option of Object.keys(options)) {
       if (!validOptionNames.includes(option)) {
@@ -29,7 +29,7 @@ export class OptionValidator {
 
   // note: we do not consider rewrite them to high order functions
   // until we have to support `validateNumberOption`.
-  validateBooleanOption<T>(
+  validateBooleanOption<T extends boolean>(
     name: string,
     value?: boolean,
     defaultValue?: T,
@@ -45,7 +45,7 @@ export class OptionValidator {
     return value;
   }
 
-  validateStringOption<T>(
+  validateStringOption<T extends string>(
     name: string,
     value?: string,
     defaultValue?: T,

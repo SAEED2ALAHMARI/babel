@@ -1,6 +1,6 @@
-import Buffer, { type Pos } from "./buffer";
-import type { Loc } from "./buffer";
-import * as n from "./node";
+import Buffer, { type Pos } from "./buffer.ts";
+import type { Loc } from "./buffer.ts";
+import * as n from "./node/index.ts";
 import type * as t from "@babel/types";
 import {
   isFunction,
@@ -9,23 +9,21 @@ import {
   isTSInterfaceBody,
   isTSEnumDeclaration,
 } from "@babel/types";
-import type {
-  RecordAndTuplePluginOptions,
-  PipelineOperatorPluginOptions,
-} from "@babel/parser";
 import type { Opts as jsescOptions } from "jsesc";
 
-import * as generatorFunctions from "./generators";
-import type SourceMap from "./source-map";
-import * as charCodes from "charcodes";
+import type { GeneratorOptions } from "./index.ts";
+import * as generatorFunctions from "./generators/index.ts";
+import type SourceMap from "./source-map.ts";
 import type { TraceMap } from "@jridgewell/trace-mapping";
+
+// We inline this package
+// eslint-disable-next-line import/no-extraneous-dependencies
+import * as charCodes from "charcodes";
 
 const SCIENTIFIC_NOTATION = /e/i;
 const ZERO_DECIMAL_INTEGER = /\.0+$/;
-const NON_DECIMAL_LITERAL = /^0[box]/;
-const PURE_ANNOTATION_RE = /^\s*[@#]__PURE__\s*$/;
 const HAS_NEWLINE = /[\n\r\u2028\u2029]/;
-const HAS_BlOCK_COMMENT_END = /\*\//;
+const HAS_NEWLINE_OR_BlOCK_COMMENT_END = /[\n\r\u2028\u2029]|\*\//;
 
 const { needsParens } = n;
 
@@ -62,7 +60,10 @@ export type Format = {
     adjustMultilineComment: boolean;
     style: string;
   };
-  recordAndTupleSyntaxType: RecordAndTuplePluginOptions["syntaxType"];
+  /**
+   * @deprecated Removed in Babel 8, syntax type is always 'hash'
+   */
+  recordAndTupleSyntaxType?: GeneratorOptions["recordAndTupleSyntaxType"];
   jsescOption: jsescOptions;
   /**
    * @deprecated Removed in Babel 8, use `jsescOption` instead
@@ -72,7 +73,7 @@ export type Format = {
    * For use with the Hack-style pipe operator.
    * Changes what token is used for pipe bodies’ topic references.
    */
-  topicToken?: PipelineOperatorPluginOptions["topicToken"];
+  topicToken?: GeneratorOptions["topicToken"];
   /**
    * @deprecated Removed in Babel 8
    */
@@ -108,22 +109,30 @@ export type PrintJoinOptions = PrintListOptions & PrintSequenceOptions;
 class Printer {
   constructor(format: Format, map: SourceMap) {
     this.format = format;
-    this._buf = new Buffer(map);
 
-    this._indentChar = format.indent.style.charCodeAt(0);
     this._indentRepeat = format.indent.style.length;
 
     this._inputMap = map?._inputMap;
+
+    this._buf = new Buffer(map, format.indent.style[0]);
   }
   declare _inputMap: TraceMap;
 
   declare format: Format;
-  inForStatementInitCounter: number = 0;
+
+  inForStatementInit: boolean = false;
+  enterForStatementInit(val: boolean) {
+    const old = this.inForStatementInit;
+    if (old === val) return () => {};
+    this.inForStatementInit = val;
+    return () => {
+      this.inForStatementInit = old;
+    };
+  }
 
   declare _buf: Buffer;
   _printStack: Array<t.Node> = [];
   _indent: number = 0;
-  _indentChar: number = 0;
   _indentRepeat: number = 0;
   _insideAux: boolean = false;
   _parenPushNewlineState: { printed: boolean } | null = null;
@@ -237,14 +246,26 @@ class Printer {
    * Writes a number token so that we can validate if it is an integer.
    */
 
-  number(str: string): void {
+  number(str: string, number?: number): void {
+    // const NON_DECIMAL_LITERAL = /^0[box]/;
+    function isNonDecimalLiteral(str: string) {
+      if (str.length > 2 && str.charCodeAt(0) === charCodes.digit0) {
+        const secondChar = str.charCodeAt(1);
+        return (
+          secondChar === charCodes.lowercaseB ||
+          secondChar === charCodes.lowercaseO ||
+          secondChar === charCodes.lowercaseX
+        );
+      }
+      return false;
+    }
     this.word(str);
 
     // Integer tokens need special handling because they cannot have '.'s inserted
     // immediately after them.
     this._endsWithInteger =
-      Number.isInteger(+str) &&
-      !NON_DECIMAL_LITERAL.test(str) &&
+      Number.isInteger(number) &&
+      !isNonDecimalLiteral(str) &&
       !SCIENTIFIC_NOTATION.test(str) &&
       !ZERO_DECIMAL_INTEGER.test(str) &&
       str.charCodeAt(str.length - 1) !== charCodes.dot;
@@ -374,21 +395,6 @@ class Printer {
     this._buf.sourceWithOffset(prop, loc, columnOffset);
   }
 
-  withSource(
-    prop: "start" | "end",
-    loc: Loc | undefined,
-    cb: () => void,
-  ): void {
-    if (!loc) {
-      cb();
-      return;
-    }
-
-    this._catchUp(prop, loc);
-
-    this._buf.withSource(prop, loc, cb);
-  }
-
   sourceIdentifierName(identifierName: string, pos?: Pos): void {
     if (!this._buf._canMarkIdName) return;
 
@@ -442,7 +448,7 @@ class Printer {
       firstChar !== charCodes.lineFeed &&
       this.endsWith(charCodes.lineFeed)
     ) {
-      this._buf.queueIndentation(this._indentChar, this._getIndent());
+      this._buf.queueIndentation(this._getIndent());
     }
   }
 
@@ -524,16 +530,7 @@ class Printer {
 
       if (chaPost === charCodes.asterisk) {
         // This is a block comment
-
-        if (PURE_ANNOTATION_RE.test(str.slice(i + 2, len - 2))) {
-          // We avoid printing newlines after #__PURE__ comments (we treat
-          // then as unary operators), but we must keep the old
-          // parenPushNewlineState because, if a newline was forbidden, it is
-          // still forbidden after the comment.
-          return;
-        }
-
-        // NOTE: code flow continues from here to after these if/elses
+        return;
       } else if (chaPost !== charCodes.slash) {
         // This is neither a block comment, nor a line comment.
         // After a normal token, the parentheses aren't needed anymore
@@ -661,19 +658,45 @@ class Printer {
     this._printStack.push(node);
 
     const oldInAux = this._insideAux;
-    this._insideAux = node.loc == undefined;
+    this._insideAux = node.loc == null;
     this._maybeAddAuxComment(this._insideAux && !oldInAux);
 
-    const shouldPrintParens =
+    const parenthesized = node.extra?.parenthesized as boolean | undefined;
+    let shouldPrintParens =
       forceParens ||
-      (format.retainFunctionParens &&
-        nodeType === "FunctionExpression" &&
-        node.extra?.parenthesized) ||
-      needsParens(node, parent, this._printStack);
+      (parenthesized &&
+        format.retainFunctionParens &&
+        nodeType === "FunctionExpression") ||
+      needsParens(node, parent, this._printStack, this.inForStatementInit);
 
+    if (
+      !shouldPrintParens &&
+      parenthesized &&
+      node.leadingComments?.length &&
+      node.leadingComments[0].type === "CommentBlock"
+    ) {
+      const parentType = parent?.type;
+      switch (parentType) {
+        case "ExpressionStatement":
+        case "VariableDeclarator":
+        case "AssignmentExpression":
+        case "ReturnStatement":
+          break;
+        case "CallExpression":
+        case "OptionalCallExpression":
+        case "NewExpression":
+          if (parent.callee !== node) break;
+        // falls through
+        default:
+          shouldPrintParens = true;
+      }
+    }
+
+    let exitInForStatementInit;
     if (shouldPrintParens) {
       this.token("(");
       this._endsWithInnerRaw = false;
+      exitInForStatementInit = this.enterForStatementInit(false);
     }
 
     this._lastCommentLine = 0;
@@ -682,12 +705,20 @@ class Printer {
 
     const loc = nodeType === "Program" || nodeType === "File" ? null : node.loc;
 
-    this.exactSource(loc, printMethod.bind(this, node, parent));
+    this.exactSource(
+      loc,
+      // We must use @ts-ignore because this error appears in VSCode but not
+      // when doing a full build?
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore https://github.com/microsoft/TypeScript/issues/58468
+      printMethod.bind(this, node, parent),
+    );
 
     if (shouldPrintParens) {
       this._printTrailingComments(node, parent);
       this.token(")");
       this._noLineTerminator = noLineTerminatorAfter;
+      exitInForStatementInit();
     } else if (noLineTerminatorAfter && !this._noLineTerminator) {
       this._noLineTerminator = true;
       this._printTrailingComments(node, parent);
@@ -800,6 +831,10 @@ class Printer {
       if (i < len - 1) separator?.();
 
       if (opts.statement) {
+        if (!node.trailingComments?.length) {
+          this._lastCommentLine = 0;
+        }
+
         if (i + 1 === len) {
           this.newline(1);
         } else {
@@ -965,8 +1000,7 @@ class Printer {
 
     if (
       this._noLineTerminator &&
-      (HAS_NEWLINE.test(comment.value) ||
-        HAS_BlOCK_COMMENT_END.test(comment.value))
+      HAS_NEWLINE_OR_BlOCK_COMMENT_END.test(comment.value)
     ) {
       return PRINT_COMMENT_HINT.DEFER;
     }
@@ -1009,6 +1043,15 @@ class Printer {
 
     let val;
     if (isBlockComment) {
+      const { _parenPushNewlineState } = this;
+      if (
+        _parenPushNewlineState?.printed === false &&
+        HAS_NEWLINE.test(comment.value)
+      ) {
+        this.token("(");
+        this.indent();
+        _parenPushNewlineState.printed = true;
+      }
       val = `/*${comment.value}*/`;
       if (this.format.indent.adjustMultilineComment) {
         const offset = comment.loc?.start.column;
@@ -1016,16 +1059,19 @@ class Printer {
           const newlineRegex = new RegExp("\\n\\s{1," + offset + "}", "g");
           val = val.replace(newlineRegex, "\n");
         }
+        if (this.format.concise) {
+          val = val.replace(/\n(?!$)/g, `\n`);
+        } else {
+          let indentSize = this.format.retainLines
+            ? 0
+            : this._buf.getCurrentColumn();
 
-        let indentSize = this.format.retainLines
-          ? 0
-          : this._buf.getCurrentColumn();
+          if (this._shouldIndent(charCodes.slash) || this.format.retainLines) {
+            indentSize += this._getIndent();
+          }
 
-        if (this._shouldIndent(charCodes.slash) || this.format.retainLines) {
-          indentSize += this._getIndent();
+          val = val.replace(/\n(?!$)/g, `\n${" ".repeat(indentSize)}`);
         }
-
-        val = val.replace(/\n(?!$)/g, `\n${" ".repeat(indentSize)}`);
       }
     } else if (!noLineTerminator) {
       val = `//${comment.value}`;
@@ -1089,7 +1135,7 @@ class Printer {
             if (
               this._buf.hasContent() &&
               (comment.type === "CommentLine" ||
-                commentStartLine != commentEndLine)
+                commentStartLine !== commentEndLine)
             ) {
               offset = leadingCommentNewline = 1;
             }
@@ -1174,8 +1220,8 @@ class Printer {
             i === 0
               ? COMMENT_SKIP_NEWLINE.LEADING
               : i === len - 1
-              ? COMMENT_SKIP_NEWLINE.TRAILING
-              : COMMENT_SKIP_NEWLINE.DEFAULT,
+                ? COMMENT_SKIP_NEWLINE.TRAILING
+                : COMMENT_SKIP_NEWLINE.DEFAULT,
           );
         } else {
           this._printComment(comment, COMMENT_SKIP_NEWLINE.DEFAULT);
@@ -1198,6 +1244,7 @@ if (!process.env.BABEL_8_BREAKING) {
 }
 
 type GeneratorFunctions = typeof generatorFunctions;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface Printer extends GeneratorFunctions {}
 export default Printer;
 

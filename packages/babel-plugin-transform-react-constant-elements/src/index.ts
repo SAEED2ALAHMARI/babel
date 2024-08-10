@@ -1,6 +1,6 @@
 import { declare } from "@babel/helper-plugin-utils";
 import { types as t, template } from "@babel/core";
-import type { Visitor, Scope, NodePath } from "@babel/traverse";
+import type { Visitor, Scope, NodePath } from "@babel/core";
 
 export interface Options {
   allowMutablePropsOnTags?: null | string[];
@@ -13,7 +13,7 @@ interface VisitorState {
   targetScope: Scope;
 }
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { allowMutablePropsOnTags } = options;
 
@@ -119,7 +119,7 @@ export default declare((api, options: Options) => {
       // Ignore constant bindings.
       if (path.isIdentifier()) {
         const binding = path.scope.getBinding(path.node.name);
-        if (binding && binding.constant) return;
+        if (binding?.constant) return;
       }
 
       // If we allow mutable props, tags with function expressions can be

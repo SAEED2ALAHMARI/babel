@@ -1,7 +1,5 @@
 import semver from "semver";
-import { minVersions } from "./available-plugins";
-
-const has = Function.call.bind(Object.hasOwnProperty);
+import { minVersions, legacyBabel7SyntaxPlugins } from "./available-plugins.ts";
 
 export function addProposalSyntaxPlugins(
   items: Set<string>,
@@ -25,12 +23,18 @@ export function removeUnsupportedItems(
 ) {
   items.forEach(item => {
     if (
-      has(minVersions, item) &&
+      Object.hasOwn(minVersions, item) &&
       semver.lt(
         babelVersion,
         // @ts-expect-error we have checked minVersions[item] in has call
         minVersions[item],
       )
+    ) {
+      items.delete(item);
+    } else if (
+      !process.env.BABEL_8_BREAKING &&
+      babelVersion[0] === "8" &&
+      legacyBabel7SyntaxPlugins.has(item)
     ) {
       items.delete(item);
     }

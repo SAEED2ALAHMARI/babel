@@ -8,23 +8,32 @@ import {
 import {
   default as getFixtures,
   resolveOptionPluginOrPreset,
+  readFile,
   type Test,
   type TestFile,
   type TaskOptions,
 } from "@babel/helper-fixtures";
 import { codeFrameColumns } from "@babel/code-frame";
-import * as helpers from "./helpers";
+import * as helpers from "./helpers.ts";
+import visualizeSourceMap from "./source-map-visualizer.ts";
 import assert from "assert";
-import fs from "fs";
+import fs, { readFileSync, realpathSync } from "fs";
 import path from "path";
 import vm from "vm";
 import LruCache from "lru-cache";
 import { fileURLToPath } from "url";
+import { diff } from "jest-diff";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
+import os from "os";
+import readdirRecursive from "fs-readdir-recursive";
 
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import checkDuplicateNodes from "@babel/helper-check-duplicate-nodes";
+import { createHash } from "crypto";
 
 type Module = {
   id: string;
@@ -58,7 +67,6 @@ const cachedScripts = new LruCache<
   { code: string; cachedData?: Buffer }
 >({ max: 10 });
 const contextModuleCache = new WeakMap();
-const sharedTestContext = createContext();
 
 // We never want our tests to accidentally load the root
 // babel.config.js file, so we disable config loading by
@@ -79,7 +87,7 @@ function transformAsyncWithoutConfigFile(code: string, opts: InputOptions) {
   });
 }
 
-function createContext() {
+export function createTestContext() {
   const context = vm.createContext({
     ...helpers,
     process: process,
@@ -191,6 +199,8 @@ function runModuleInTestContext(
   ).exports;
 }
 
+let sharedTestContext: vm.Context;
+
 /**
  * Run the given snippet of code inside a CommonJS module.
  *
@@ -201,7 +211,7 @@ export function runCodeInTestContext(
   opts: {
     filename: string;
   },
-  context = sharedTestContext,
+  context = (sharedTestContext ??= createTestContext()),
 ) {
   const filename = opts.filename;
   const dirname = path.dirname(filename);
@@ -291,8 +301,10 @@ async function run(task: Test) {
   let result: FileResult;
   let resultExec;
 
+  let execErr: Error;
+
   if (execCode) {
-    const context = createContext();
+    const context = createTestContext();
     const execOpts = getOpts(exec);
 
     // Ignore Babel logs of exec.js files.
@@ -308,9 +320,13 @@ async function run(task: Test) {
       resultExec = runCodeInTestContext(execCode, execOpts, context);
     } catch (err) {
       // Pass empty location to include the whole file in the output.
-      err.message =
-        `${exec.loc}: ${err.message}\n` + codeFrameColumns(execCode, {} as any);
-      throw err;
+      if (typeof err === "object" && err.message) {
+        err.message =
+          `${exec.loc}: ${err.message}\n` +
+          codeFrameColumns(execCode, {} as any);
+      }
+
+      execErr = err;
     }
   }
 
@@ -323,7 +339,9 @@ async function run(task: Test) {
       babel.transformAsync(inputCode, getOpts(actual)),
     ));
 
-    const outputCode = normalizeOutput(result.code);
+    const outputCode = normalizeOutput(result.code, {
+      normalizePathSeparator: true,
+    });
 
     checkDuplicateNodes(result.ast);
     if (!ignoreOutput) {
@@ -345,7 +363,7 @@ async function run(task: Test) {
         if (expected.loc !== expectedFile) {
           try {
             fs.unlinkSync(expected.loc);
-          } catch (e) {}
+          } catch (_) {}
         }
       } else {
         validateFile(outputCode, expected.loc, expectedCode);
@@ -385,11 +403,32 @@ async function run(task: Test) {
     }
   }
 
+  if (execErr) {
+    throw execErr;
+  }
+
+  if (task.validateSourceMapVisual === true) {
+    const visual = visualizeSourceMap(result.code, result.map);
+    try {
+      expect(visual).toEqual(task.sourceMapVisual.code);
+    } catch (e) {
+      if (!process.env.OVERWRITE && task.sourceMapVisual.code) throw e;
+
+      console.log(`Updated test file: ${task.sourceMapVisual.loc}`);
+      fs.writeFileSync(
+        task.sourceMapVisual.loc ?? task.taskDir + "/source-map-visual.txt",
+        visual + "\n",
+      );
+    }
+  }
+
   if (opts.sourceMaps === true) {
     try {
       expect(result.map).toEqual(task.sourceMap);
     } catch (e) {
       if (!process.env.OVERWRITE && task.sourceMap) throw e;
+
+      task.sourceMapFile.loc ??= task.taskDir + "/source-map.json";
 
       console.log(`Updated test file: ${task.sourceMapFile.loc}`);
       fs.writeFileSync(
@@ -409,16 +448,19 @@ function validateFile(
   expectedLoc: string,
   expectedCode: string,
 ) {
-  try {
-    expect(actualCode).toEqualFile({
-      filename: expectedLoc,
-      code: expectedCode,
-    });
-  } catch (e) {
-    if (!process.env.OVERWRITE) throw e;
+  if (actualCode !== expectedCode) {
+    if (process.env.OVERWRITE) {
+      console.log(`Updated test file: ${expectedLoc}`);
+      fs.writeFileSync(expectedLoc, `${actualCode}\n`);
+      return;
+    }
 
-    console.log(`Updated test file: ${expectedLoc}`);
-    fs.writeFileSync(expectedLoc, `${actualCode}\n`);
+    throw new Error(
+      `Expected ${expectedLoc} to match transform output.\n` +
+        `To autogenerate a passing version of this file, delete ` +
+        ` the file and re-run the tests.\n\n` +
+        `Diff:\n\n${diff(expectedCode, actualCode, { expand: false })}`,
+    );
   }
 }
 
@@ -430,31 +472,29 @@ function normalizeOutput(
   code: string,
   { normalizePathSeparator = false, normalizePresetEnvDebug = false } = {},
 ) {
-  const projectRoot = path.resolve(
+  const dir = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "../../../",
   );
-  const cwdSymbol = "<CWD>";
+  const symbol = "<CWD>";
   let result = code
     .trim()
     // (non-win32) /foo/babel/packages -> <CWD>/packages
     // (win32) C:\foo\babel\packages -> <CWD>\packages
-    .replace(new RegExp(escapeRegExp(projectRoot), "g"), cwdSymbol);
+    .replace(new RegExp(escapeRegExp(dir), "g"), symbol);
   if (process.platform === "win32") {
     result = result
       // C:/foo/babel/packages -> <CWD>/packages
-      .replace(
-        new RegExp(escapeRegExp(projectRoot.replace(/\\/g, "/")), "g"),
-        cwdSymbol,
-      )
+      .replace(new RegExp(escapeRegExp(dir.replace(/\\/g, "/")), "g"), symbol)
       // C:\\foo\\babel\\packages -> <CWD>\\packages (in js string literal)
       .replace(
-        new RegExp(escapeRegExp(projectRoot.replace(/\\/g, "\\\\")), "g"),
-        cwdSymbol,
+        new RegExp(escapeRegExp(dir.replace(/\\/g, "\\\\")), "g"),
+        symbol,
       );
     if (normalizePathSeparator) {
-      result = result.replace(/<CWD>[\w\\/.-]+/g, path =>
-        path.replace(/\\\\?/g, "/"),
+      result = result.replace(
+        new RegExp(`${escapeRegExp(symbol)}[\\w\\\\/.-]+`, "g"),
+        path => path.replace(/\\\\?/g, "/"),
       );
     }
   }
@@ -481,42 +521,6 @@ function normalizeOutput(
   return result;
 }
 
-expect.extend({
-  toEqualFile(actual, { filename, code }: Pick<TestFile, "filename" | "code">) {
-    if (this.isNot) {
-      throw new Error(".toEqualFile does not support negation");
-    }
-
-    const pass = actual === code;
-    return {
-      pass,
-      message: () => {
-        const diffString = this.utils.diff(code, actual, {
-          expand: false,
-        });
-        return (
-          `Expected ${filename} to match transform output.\n` +
-          `To autogenerate a passing version of this file, delete the file and re-run the tests.\n\n` +
-          `Diff:\n\n${diffString}`
-        );
-      },
-    };
-  },
-});
-
-declare global {
-  // eslint-disable-next-line no-redeclare,@typescript-eslint/no-unused-vars
-  namespace jest {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    interface Matchers<R> {
-      toEqualFile({
-        filename,
-        code,
-      }: Pick<TestFile, "filename" | "code">): jest.CustomMatcherResult;
-    }
-  }
-}
-
 export type SuiteOptions = {
   ignoreSuites?: string[];
   ignoreTasks?: string[];
@@ -535,6 +539,17 @@ export default function (
     if (suiteOpts.ignoreSuites?.includes(testSuite.title)) continue;
 
     describe(name + "/" + testSuite.title, function () {
+      if (
+        !process.env.IS_PUBLISH &&
+        process.env.TEST_babel7plugins_babel8core
+      ) {
+        // Make sure that the ESM version of @babel/core is always loaded
+        // for babel7-8 interop tests.
+        // In `eval` so that it doesn't cause a syntax error when running
+        // tests in old Node.js.
+        beforeAll(() => eval('import("@babel/core")').catch(console.error));
+      }
+
       for (const task of testSuite.tests) {
         if (
           suiteOpts.ignoreTasks?.includes(task.title) ||
@@ -544,9 +559,13 @@ export default function (
         }
 
         const testFn = task.disabled ? it.skip : it;
+        const testTitle =
+          typeof task.disabled === "string"
+            ? `(SKIP: ${task.disabled}) ${task.title}`
+            : task.title;
 
         testFn(
-          task.title,
+          testTitle,
 
           async function () {
             const runTask = () => run(task);
@@ -597,4 +616,417 @@ Actual Error: ${err.message}`,
       }
     });
   }
+}
+
+export type ProcessTestOpts = {
+  args: string[];
+  executor?: string;
+  ipc?: boolean;
+  ipcMessage?: string;
+  stdout?: string;
+  stderr?: string;
+  stdin?: string;
+  stdoutPath?: string;
+  stderrPath?: string;
+  stdoutContains?: boolean;
+  stderrContains?: boolean;
+  testLoc?: string;
+  outFiles?: Record<string, string>;
+  inFiles?: Record<string, string>;
+  noBabelrc?: boolean;
+  minNodeVersion?: number;
+  flaky?: boolean;
+  env?: Record<string, string>;
+  BABEL_8_BREAKING?: boolean;
+};
+
+export type ProcessTest = {
+  suiteName: string;
+  testName: string;
+  skip: boolean;
+  fn: Function;
+  opts: ProcessTestOpts;
+  binLoc?: string;
+};
+
+export type ProcessTestBeforeHook = (test: ProcessTest, tmpDir: string) => void;
+export type ProcessTestAfterHook = (
+  test: ProcessTest,
+  tmpDir: string,
+  stdout: string,
+  stderr: string,
+) => {
+  stdout: string;
+  stderr: string;
+};
+
+const nodeGte8 = parseInt(process.versions.node, 10) >= 8;
+
+// https://github.com/nodejs/node/issues/11422#issue-208189446
+const tmpDir = realpathSync(os.tmpdir());
+
+const readDir = function (loc: string, pathFilter: (arg0: string) => boolean) {
+  const files: Record<string, string> = {};
+  if (fs.existsSync(loc)) {
+    if (process.env.BABEL_8_BREAKING) {
+      fs.readdirSync(loc, { withFileTypes: true, recursive: true })
+        .filter(dirent => dirent.isFile() && pathFilter(dirent.name))
+        .forEach(dirent => {
+          const fullpath = path.join(dirent.path, dirent.name);
+          files[path.relative(loc, fullpath)] = readFile(fullpath);
+        });
+    } else {
+      readdirRecursive(loc, pathFilter).forEach(function (filename) {
+        files[filename] = readFile(path.join(loc, filename));
+      });
+    }
+  }
+  return files;
+};
+
+const outputFileSync = function (filePath: string, data: string) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, data);
+};
+
+function deleteDir(path: string): void {
+  fs.rmSync(path, { force: true, recursive: true });
+}
+
+const pathFilter = function (x: string) {
+  return path.basename(x) !== ".DS_Store";
+};
+
+const assertTest = function (
+  stdout: string,
+  stderr: string,
+  ipcMessage: unknown,
+  opts: ProcessTestOpts,
+  tmpDir: string,
+) {
+  const expectStderr = opts.stderr.trim();
+  stderr = stderr.trim();
+
+  try {
+    if (opts.stderr) {
+      if (opts.stderrContains) {
+        expect(stderr).toContain(expectStderr);
+      } else {
+        expect(stderr).toBe(expectStderr);
+      }
+    } else if (stderr) {
+      throw new Error("stderr:\n" + stderr);
+    }
+  } catch (e) {
+    if (!process.env.OVERWRITE) throw e;
+    console.log(`Updated test file: ${opts.stderrPath}`);
+    outputFileSync(opts.stderrPath, stderr + "\n");
+  }
+
+  const expectStdout = opts.stdout.trim();
+  stdout = stdout.trim();
+  stdout = stdout.replace(/\\/g, "/");
+
+  try {
+    if (opts.stdout) {
+      if (opts.stdoutContains) {
+        expect(stdout).toContain(expectStdout);
+      } else {
+        expect(stdout).toBe(expectStdout);
+      }
+    } else if (stdout) {
+      throw new Error("stdout:\n" + stdout);
+    }
+  } catch (e) {
+    console.log(JSON.stringify(opts.stdout), JSON.stringify(stdout));
+    if (!process.env.OVERWRITE) throw e;
+    console.log(`Updated test file: ${opts.stdoutPath}`);
+    outputFileSync(opts.stdoutPath, stdout + "\n");
+  }
+
+  if (opts.ipc) {
+    expect(ipcMessage).toEqual(opts.ipcMessage);
+  }
+
+  if (opts.outFiles) {
+    const actualFiles = readDir(tmpDir, pathFilter);
+
+    Object.keys(actualFiles).forEach(function (filename) {
+      try {
+        if (
+          // saveInFiles always creates an empty .babelrc, so lets exclude for now
+          filename !== ".babelrc" &&
+          filename !== ".babelignore" &&
+          !Object.hasOwn(opts.inFiles, filename)
+        ) {
+          const expected = opts.outFiles[filename];
+          const actual = actualFiles[filename];
+
+          expect(actual).toBe(expected || "");
+        }
+      } catch (e) {
+        if (!process.env.OVERWRITE) {
+          e.message += "\n at " + filename;
+          throw e;
+        }
+        const expectedLoc = path.join(opts.testLoc, "out-files", filename);
+        console.log(`Updated test file: ${expectedLoc}`);
+        outputFileSync(expectedLoc, actualFiles[filename]);
+      }
+    });
+
+    Object.keys(opts.outFiles).forEach(function (filename) {
+      expect(actualFiles).toHaveProperty([filename]);
+    });
+  }
+};
+
+export function buildParallelProcessTests(name: string, tests: ProcessTest[]) {
+  return function (curr: number, total: number) {
+    const sliceLength = Math.ceil(tests.length / total);
+    const sliceStart = curr * sliceLength;
+    const sliceEnd = sliceStart + sliceLength;
+    const testsSlice = tests.slice(sliceStart, sliceEnd);
+
+    describe(`${name} [${curr}/${total}]`, function () {
+      it("dummy", () => {});
+      for (const test of testsSlice) {
+        (test.skip ? it.skip : it)(
+          test.suiteName + " " + test.testName,
+          test.fn as any,
+        );
+      }
+    });
+  };
+}
+
+export function buildProcessTests(
+  dir: string,
+  beforeHook: ProcessTestBeforeHook,
+  afterHook?: ProcessTestAfterHook,
+) {
+  const tests: ProcessTest[] = [];
+
+  fs.readdirSync(dir).forEach(function (suiteName) {
+    if (suiteName.startsWith(".") || suiteName === "package.json") return;
+
+    const suiteLoc = path.join(dir, suiteName);
+
+    fs.readdirSync(suiteLoc).forEach(function (testName) {
+      if (testName.startsWith(".")) return;
+
+      const testLoc = path.join(suiteLoc, testName);
+
+      let opts: ProcessTestOpts = {
+        args: [],
+      };
+
+      const optionsLoc = path.join(testLoc, "options.json");
+      if (fs.existsSync(optionsLoc)) {
+        const taskOpts = JSON.parse(readFileSync(optionsLoc, "utf8"));
+        if (taskOpts.os) {
+          let os = taskOpts.os;
+
+          if (!Array.isArray(os) && typeof os !== "string") {
+            throw new Error(
+              `'os' should be either string or string array: ${taskOpts.os}`,
+            );
+          }
+
+          if (typeof os === "string") {
+            os = [os];
+          }
+
+          if (!os.includes(process.platform)) {
+            return;
+          }
+
+          delete taskOpts.os;
+        }
+        opts = { args: [], ...taskOpts };
+      }
+
+      const executorLoc = path.join(testLoc, "executor.js");
+      if (fs.existsSync(executorLoc)) {
+        opts.executor = executorLoc;
+      }
+
+      opts.stderrPath = path.join(testLoc, "stderr.txt");
+      opts.stdoutPath = path.join(testLoc, "stdout.txt");
+      for (const key of ["stdout", "stdin", "stderr"] as const) {
+        const loc = path.join(testLoc, key + ".txt");
+        if (fs.existsSync(loc)) {
+          opts[key] = readFile(loc);
+        } else {
+          opts[key] = opts[key] || "";
+        }
+      }
+
+      opts.testLoc = testLoc;
+      opts.outFiles = readDir(path.join(testLoc, "out-files"), pathFilter);
+      opts.inFiles = readDir(path.join(testLoc, "in-files"), pathFilter);
+
+      const babelrcLoc = path.join(testLoc, ".babelrc");
+      const babelIgnoreLoc = path.join(testLoc, ".babelignore");
+      if (fs.existsSync(babelrcLoc)) {
+        // copy .babelrc file to tmp directory
+        opts.inFiles[".babelrc"] = readFile(babelrcLoc);
+      } else if (!opts.noBabelrc) {
+        opts.inFiles[".babelrc"] = "{}";
+      }
+      if (fs.existsSync(babelIgnoreLoc)) {
+        // copy .babelignore file to tmp directory
+        opts.inFiles[".babelignore"] = readFile(babelIgnoreLoc);
+      }
+
+      const skip =
+        (opts.minNodeVersion &&
+          parseInt(process.versions.node, 10) < opts.minNodeVersion) ||
+        (opts.flaky && !process.env.BABEL_CLI_FLAKY_TESTS) ||
+        opts.BABEL_8_BREAKING === false;
+
+      if (opts.flaky) {
+        testName += " (flaky)";
+      }
+
+      const test: ProcessTest = {
+        suiteName,
+        testName,
+        skip,
+        opts,
+        fn: function (callback: Function) {
+          const tmpLoc = path.join(
+            tmpDir,
+            "babel-process-test",
+            createHash("sha1").update(testLoc).digest("hex"),
+          );
+          deleteDir(tmpLoc);
+          fs.mkdirSync(tmpLoc, { recursive: true });
+
+          const { inFiles } = opts;
+          for (const filename of Object.keys(inFiles)) {
+            outputFileSync(path.join(tmpLoc, filename), inFiles[filename]);
+          }
+
+          try {
+            beforeHook(test, tmpLoc);
+
+            if (test.binLoc === undefined) {
+              throw new Error("test.binLoc is undefined");
+            }
+
+            let args =
+              opts.executor && nodeGte8
+                ? [
+                    "--require",
+                    path.join(dirname, "./exit-loader.cjs"),
+                    test.binLoc,
+                  ]
+                : [test.binLoc];
+
+            args = args.concat(opts.args);
+            const env = { ...process.env, FORCE_COLOR: "false", ...opts.env };
+            const child = spawn(process.execPath, args, {
+              env,
+              cwd: tmpLoc,
+              stdio:
+                (opts.executor && nodeGte8) || opts.ipc
+                  ? ["pipe", "pipe", "pipe", "ipc"]
+                  : "pipe",
+            });
+
+            let stderr = "";
+            let stdout = "";
+            let ipcMessage: unknown;
+
+            child.on("close", function () {
+              let err;
+
+              try {
+                const result = afterHook
+                  ? afterHook(test, tmpLoc, stdout, stderr)
+                  : { stdout, stderr };
+                assertTest(
+                  result.stdout,
+                  result.stderr,
+                  ipcMessage,
+                  opts,
+                  tmpLoc,
+                );
+              } catch (e) {
+                err = e;
+              } finally {
+                try {
+                  deleteDir(tmpLoc);
+                } catch (error) {
+                  console.error(error);
+                }
+              }
+
+              if (err) {
+                err.message =
+                  args.map(arg => `"${arg}"`).join(" ") + ": " + err.message;
+              }
+
+              callback(err);
+            });
+
+            if (opts.ipc) {
+              child.on("message", function (message) {
+                ipcMessage = message;
+              });
+            }
+
+            if (opts.stdin) {
+              child.stdin.write(opts.stdin);
+              child.stdin.end();
+            }
+
+            const captureOutput = (proc: ChildProcess) => {
+              proc.stderr.on("data", function (chunk) {
+                stderr += chunk;
+              });
+
+              proc.stdout.on("data", function (chunk) {
+                stdout += chunk;
+              });
+            };
+
+            if (opts.executor) {
+              const executor = spawn(process.execPath, [opts.executor], {
+                cwd: tmpLoc,
+              });
+
+              child.stdout.pipe(executor.stdin);
+              child.stderr.pipe(executor.stdin);
+
+              executor.on("close", function () {
+                if (nodeGte8) {
+                  child.send("exit");
+                } else {
+                  child.kill("SIGKILL");
+                }
+              });
+
+              captureOutput(executor);
+            } else {
+              captureOutput(child);
+            }
+          } catch (e) {
+            deleteDir(tmpLoc);
+            throw e;
+          }
+        },
+      };
+      tests.push(test);
+    });
+  });
+
+  tests.sort(function (testA, testB) {
+    const nameA = testA.suiteName + "/" + testA.testName;
+    const nameB = testB.suiteName + "/" + testB.testName;
+    return nameA.localeCompare(nameB);
+  });
+
+  return tests;
 }

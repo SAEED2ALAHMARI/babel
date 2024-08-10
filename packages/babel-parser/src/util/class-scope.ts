@@ -1,7 +1,7 @@
-import { ClassElementType } from "./scopeflags";
-import type { Position } from "./location";
-import { Errors } from "../parse-error";
-import type Tokenizer from "../tokenizer";
+import { ClassElementType } from "./scopeflags.ts";
+import type { Position } from "./location.ts";
+import { Errors } from "../parse-error.ts";
+import type Tokenizer from "../tokenizer/index.ts";
 
 export class ClassScope {
   // A list of private named declared in the current class
@@ -47,8 +47,7 @@ export default class ClassScopeHandler {
           current.undefinedPrivateNames.set(name, loc);
         }
       } else {
-        this.parser.raise(Errors.InvalidPrivateFieldResolution, {
-          at: loc,
+        this.parser.raise(Errors.InvalidPrivateFieldResolution, loc, {
           identifierName: name,
         });
       }
@@ -85,8 +84,7 @@ export default class ClassScopeHandler {
     }
 
     if (redefined) {
-      this.parser.raise(Errors.PrivateNameRedeclaration, {
-        at: loc,
+      this.parser.raise(Errors.PrivateNameRedeclaration, loc, {
         identifierName: name,
       });
     }
@@ -105,8 +103,7 @@ export default class ClassScopeHandler {
       classScope.undefinedPrivateNames.set(name, loc);
     } else {
       // top-level
-      this.parser.raise(Errors.InvalidPrivateFieldResolution, {
-        at: loc,
+      this.parser.raise(Errors.InvalidPrivateFieldResolution, loc, {
         identifierName: name,
       });
     }

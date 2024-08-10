@@ -5,6 +5,5 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.default = void 0;
 var _b = _interopRequireDefault(require("./b"));
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-var _someFunction = function someFunction() {};
-exports.default = _someFunction;
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+var _someFunction = exports.default = function someFunction() {};

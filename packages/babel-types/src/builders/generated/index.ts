@@ -2,9 +2,9 @@
  * This file is auto-generated! Do not modify it directly.
  * To re-generate run 'make build'
  */
-import validateNode from "../validateNode";
-import type * as t from "../..";
-import deprecationWarning from "../../utils/deprecationWarning";
+import validateNode from "../validateNode.ts";
+import type * as t from "../../index.ts";
+import deprecationWarning from "../../utils/deprecationWarning.ts";
 export function arrayExpression(
   elements: Array<null | t.Expression | t.SpreadElement> = [],
 ): t.ArrayExpression {
@@ -15,7 +15,7 @@ export function arrayExpression(
 }
 export function assignmentExpression(
   operator: string,
-  left: t.LVal,
+  left: t.LVal | t.OptionalMemberExpression,
   right: t.Expression,
 ): t.AssignmentExpression {
   return validateNode<t.AssignmentExpression>({
@@ -98,9 +98,7 @@ export function breakStatement(
 }
 export function callExpression(
   callee: t.Expression | t.Super | t.V8IntrinsicIdentifier,
-  _arguments: Array<
-    t.Expression | t.SpreadElement | t.JSXNamespacedName | t.ArgumentPlaceholder
-  >,
+  _arguments: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>,
 ): t.CallExpression {
   return validateNode<t.CallExpression>({
     type: "CallExpression",
@@ -330,9 +328,7 @@ export function memberExpression(
 }
 export function newExpression(
   callee: t.Expression | t.Super | t.V8IntrinsicIdentifier,
-  _arguments: Array<
-    t.Expression | t.SpreadElement | t.JSXNamespacedName | t.ArgumentPlaceholder
-  >,
+  _arguments: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>,
 ): t.NewExpression {
   return validateNode<t.NewExpression>({
     type: "NewExpression",
@@ -352,7 +348,6 @@ export function program(
     directives,
     sourceType,
     interpreter,
-    sourceFile: null,
   });
 }
 export function objectExpression(
@@ -619,7 +614,7 @@ export function classExpression(
   });
 }
 export function classDeclaration(
-  id: t.Identifier,
+  id: t.Identifier | null | undefined = null,
   superClass: t.Expression | null | undefined = null,
   body: t.ClassBody,
   decorators: Array<t.Decorator> | null = null,
@@ -726,6 +721,16 @@ export function importSpecifier(
     type: "ImportSpecifier",
     local,
     imported,
+  });
+}
+export function importExpression(
+  source: t.Expression,
+  options: t.Expression | null = null,
+): t.ImportExpression {
+  return validateNode<t.ImportExpression>({
+    type: "ImportExpression",
+    source,
+    options,
   });
 }
 export function metaProperty(
@@ -869,9 +874,7 @@ export function optionalMemberExpression(
 }
 export function optionalCallExpression(
   callee: t.Expression,
-  _arguments: Array<
-    t.Expression | t.SpreadElement | t.JSXNamespacedName | t.ArgumentPlaceholder
-  >,
+  _arguments: Array<t.Expression | t.SpreadElement | t.ArgumentPlaceholder>,
   optional: boolean,
 ): t.OptionalCallExpression {
   return validateNode<t.OptionalCallExpression>({
@@ -1927,7 +1930,9 @@ export function tsQualifiedName(
 export { tsQualifiedName as tSQualifiedName };
 export function tsCallSignatureDeclaration(
   typeParameters: t.TSTypeParameterDeclaration | null | undefined = null,
-  parameters: Array<t.Identifier | t.RestElement>,
+  parameters: Array<
+    t.ArrayPattern | t.Identifier | t.ObjectPattern | t.RestElement
+  >,
   typeAnnotation: t.TSTypeAnnotation | null = null,
 ): t.TSCallSignatureDeclaration {
   return validateNode<t.TSCallSignatureDeclaration>({
@@ -1940,7 +1945,9 @@ export function tsCallSignatureDeclaration(
 export { tsCallSignatureDeclaration as tSCallSignatureDeclaration };
 export function tsConstructSignatureDeclaration(
   typeParameters: t.TSTypeParameterDeclaration | null | undefined = null,
-  parameters: Array<t.Identifier | t.RestElement>,
+  parameters: Array<
+    t.ArrayPattern | t.Identifier | t.ObjectPattern | t.RestElement
+  >,
   typeAnnotation: t.TSTypeAnnotation | null = null,
 ): t.TSConstructSignatureDeclaration {
   return validateNode<t.TSConstructSignatureDeclaration>({
@@ -1954,13 +1961,11 @@ export { tsConstructSignatureDeclaration as tSConstructSignatureDeclaration };
 export function tsPropertySignature(
   key: t.Expression,
   typeAnnotation: t.TSTypeAnnotation | null = null,
-  initializer: t.Expression | null = null,
 ): t.TSPropertySignature {
   return validateNode<t.TSPropertySignature>({
     type: "TSPropertySignature",
     key,
     typeAnnotation,
-    initializer,
     kind: null,
   });
 }
@@ -1968,7 +1973,9 @@ export { tsPropertySignature as tSPropertySignature };
 export function tsMethodSignature(
   key: t.Expression,
   typeParameters: t.TSTypeParameterDeclaration | null | undefined = null,
-  parameters: Array<t.Identifier | t.RestElement>,
+  parameters: Array<
+    t.ArrayPattern | t.Identifier | t.ObjectPattern | t.RestElement
+  >,
   typeAnnotation: t.TSTypeAnnotation | null = null,
 ): t.TSMethodSignature {
   return validateNode<t.TSMethodSignature>({
@@ -2078,7 +2085,9 @@ export function tsThisType(): t.TSThisType {
 export { tsThisType as tSThisType };
 export function tsFunctionType(
   typeParameters: t.TSTypeParameterDeclaration | null | undefined = null,
-  parameters: Array<t.Identifier | t.RestElement>,
+  parameters: Array<
+    t.ArrayPattern | t.Identifier | t.ObjectPattern | t.RestElement
+  >,
   typeAnnotation: t.TSTypeAnnotation | null = null,
 ): t.TSFunctionType {
   return validateNode<t.TSFunctionType>({
@@ -2091,7 +2100,9 @@ export function tsFunctionType(
 export { tsFunctionType as tSFunctionType };
 export function tsConstructorType(
   typeParameters: t.TSTypeParameterDeclaration | null | undefined = null,
-  parameters: Array<t.Identifier | t.RestElement>,
+  parameters: Array<
+    t.ArrayPattern | t.Identifier | t.ObjectPattern | t.RestElement
+  >,
   typeAnnotation: t.TSTypeAnnotation | null = null,
 ): t.TSConstructorType {
   return validateNode<t.TSConstructorType>({

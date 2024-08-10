@@ -1,13 +1,12 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { template, types as t } from "@babel/core";
-import type { NodePath } from "@babel/traverse";
+import { template, types as t, type NodePath } from "@babel/core";
 
 export interface Options {
   loose?: boolean;
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const ignoreToPrimitiveHint =
     api.assumption("ignoreToPrimitiveHint") ?? options.loose;

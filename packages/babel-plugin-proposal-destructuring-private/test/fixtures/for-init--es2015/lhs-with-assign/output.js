@@ -1,13 +1,12 @@
-var _class;
+var _C;
 class C {}
-_class = C;
+_C = C;
 var _x = {
-  writable: true,
-  value: 42
+  _: 42
 };
 (() => {
   let x, y;
-  for (_m = (_m2 = _class, y = babelHelpers.classStaticPrivateFieldSpecGet(_m2, _class, _x), _m2), x = babelHelpers.classStaticPrivateFieldSpecGet(_m, _class, _x), _m;;) {
+  for (_m = (_m2 = _C, y = babelHelpers.assertClassBrand(_C, _m2, _x)._, _m2), x = babelHelpers.assertClassBrand(_C, _m, _x)._, _m;;) {
     var _m, _m2;
     break;
   }

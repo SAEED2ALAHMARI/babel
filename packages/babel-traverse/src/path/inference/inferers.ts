@@ -20,10 +20,10 @@ import {
 } from "@babel/types";
 import type * as t from "@babel/types";
 
-export { default as Identifier } from "./inferer-reference";
+export { default as Identifier } from "./inferer-reference.ts";
 
-import { createUnionType } from "./util";
-import type NodePath from "..";
+import { createUnionType } from "./util.ts";
+import type NodePath from "../index.ts";
 
 export function VariableDeclarator(this: NodePath<t.VariableDeclarator>) {
   if (!this.get("id").isIdentifier()) return;
@@ -65,11 +65,11 @@ export function UnaryExpression(node: t.UnaryExpression) {
 
   if (operator === "void") {
     return voidTypeAnnotation();
-  } else if (NUMBER_UNARY_OPERATORS.indexOf(operator) >= 0) {
+  } else if (NUMBER_UNARY_OPERATORS.includes(operator)) {
     return numberTypeAnnotation();
-  } else if (STRING_UNARY_OPERATORS.indexOf(operator) >= 0) {
+  } else if (STRING_UNARY_OPERATORS.includes(operator)) {
     return stringTypeAnnotation();
-  } else if (BOOLEAN_UNARY_OPERATORS.indexOf(operator) >= 0) {
+  } else if (BOOLEAN_UNARY_OPERATORS.includes(operator)) {
     return booleanTypeAnnotation();
   }
 }
@@ -80,9 +80,9 @@ export function BinaryExpression(
 ) {
   const operator = node.operator;
 
-  if (NUMBER_BINARY_OPERATORS.indexOf(operator) >= 0) {
+  if (NUMBER_BINARY_OPERATORS.includes(operator)) {
     return numberTypeAnnotation();
-  } else if (BOOLEAN_BINARY_OPERATORS.indexOf(operator) >= 0) {
+  } else if (BOOLEAN_BINARY_OPERATORS.includes(operator)) {
     return booleanTypeAnnotation();
   } else if (operator === "+") {
     const right = this.get("right");

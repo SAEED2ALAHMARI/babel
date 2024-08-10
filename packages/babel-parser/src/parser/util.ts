@@ -1,29 +1,34 @@
-import type { Position } from "../util/location";
+import type { Position } from "../util/location.ts";
 import {
   tokenIsLiteralPropertyName,
   tt,
   type TokenType,
-} from "../tokenizer/types";
-import Tokenizer from "../tokenizer";
-import type State from "../tokenizer/state";
-import type { EstreePropertyDefinition, Node, ObjectProperty } from "../types";
-import { lineBreak, skipWhiteSpaceToLineBreak } from "../util/whitespace";
-import { isIdentifierChar } from "../util/identifier";
-import ClassScopeHandler from "../util/class-scope";
-import ExpressionScopeHandler from "../util/expression-scope";
-import { ScopeFlag } from "../util/scopeflags";
+} from "../tokenizer/types.ts";
+import Tokenizer from "../tokenizer/index.ts";
+import type State from "../tokenizer/state.ts";
+import type {
+  EstreePropertyDefinition,
+  Node,
+  ObjectMethod,
+  ObjectProperty,
+  PrivateName,
+} from "../types.d.ts";
+import { lineBreak, skipWhiteSpaceToLineBreak } from "../util/whitespace.ts";
+import { isIdentifierChar } from "../util/identifier.ts";
+import ClassScopeHandler from "../util/class-scope.ts";
+import ExpressionScopeHandler from "../util/expression-scope.ts";
+import { ScopeFlag } from "../util/scopeflags.ts";
 import ProductionParameterHandler, {
-  PARAM_AWAIT,
-  PARAM,
-} from "../util/production-parameter";
+  ParamKind,
+} from "../util/production-parameter.ts";
 import {
   Errors,
   type ParseError,
   type ParseErrorConstructor,
-} from "../parse-error";
-import type Parser from ".";
+} from "../parse-error.ts";
+import type Parser from "./index.ts";
 
-import type ScopeHandler from "../util/scope";
+import type ScopeHandler from "../util/scope.ts";
 
 type TryParse<Node, Error, Thrown, Aborted, FailState> = {
   node: Node;
@@ -37,7 +42,7 @@ type TryParse<Node, Error, Thrown, Aborted, FailState> = {
 
 export default abstract class UtilParser extends Tokenizer {
   // Forward-declaration: defined in parser/index.js
-  abstract getScopeHandler(): { new (...args: any): ScopeHandler };
+  abstract getScopeHandler(): new (...args: any) => ScopeHandler;
 
   addExtra(
     node: Partial<Node>,
@@ -99,7 +104,7 @@ export default abstract class UtilParser extends Tokenizer {
   ): void {
     if (!this.eatContextual(token)) {
       if (toParseError != null) {
-        throw this.raise(toParseError, { at: this.state.startLoc });
+        throw this.raise(toParseError, this.state.startLoc);
       }
       this.unexpected(null, token);
     }
@@ -135,14 +140,16 @@ export default abstract class UtilParser extends Tokenizer {
 
   semicolon(allowAsi: boolean = true): void {
     if (allowAsi ? this.isLineTerminator() : this.eat(tt.semi)) return;
-    this.raise(Errors.MissingSemicolon, { at: this.state.lastTokEndLoc });
+    this.raise(Errors.MissingSemicolon, this.state.lastTokEndLoc);
   }
 
   // Expect a token of a given type. If found, consume it, otherwise,
   // raise an unexpected token error at given pos.
 
   expect(type: TokenType, loc?: Position | null): void {
-    this.eat(type) || this.unexpected(loc, type);
+    if (!this.eat(type)) {
+      this.unexpected(loc, type);
+    }
   }
 
   // tryParse will clone parser state.
@@ -160,6 +167,7 @@ export default abstract class UtilParser extends Tokenizer {
     try {
       const node = fn((node = null) => {
         abortSignal.node = node;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw abortSignal;
       });
       if (this.state.errors.length > oldState.errors.length) {
@@ -229,17 +237,15 @@ export default abstract class UtilParser extends Tokenizer {
     }
 
     if (shorthandAssignLoc != null) {
-      this.raise(Errors.InvalidCoverInitializedName, {
-        at: shorthandAssignLoc,
-      });
+      this.raise(Errors.InvalidCoverInitializedName, shorthandAssignLoc);
     }
 
     if (doubleProtoLoc != null) {
-      this.raise(Errors.DuplicateProto, { at: doubleProtoLoc });
+      this.raise(Errors.DuplicateProto, doubleProtoLoc);
     }
 
     if (privateKeyLoc != null) {
-      this.raise(Errors.UnexpectedPrivateField, { at: privateKeyLoc });
+      this.raise(Errors.UnexpectedPrivateField, privateKeyLoc);
     }
 
     if (optionalParametersLoc != null) {
@@ -264,7 +270,7 @@ export default abstract class UtilParser extends Tokenizer {
    * Test if given node is a PrivateName
    * will be overridden in ESTree plugin
    */
-  isPrivateName(node: Node): boolean {
+  isPrivateName(node: Node): node is PrivateName {
     return node.type === "PrivateName";
   }
 
@@ -273,7 +279,7 @@ export default abstract class UtilParser extends Tokenizer {
    * WITHOUT `#`
    * @see {@link https://tc39.es/ecma262/#sec-static-semantics-stringvalue}
    */
-  getPrivateNameSV(node: Node): string {
+  getPrivateNameSV(node: PrivateName): string {
     return node.id.name;
   }
 
@@ -296,7 +302,7 @@ export default abstract class UtilParser extends Tokenizer {
     return node.type === "ObjectProperty";
   }
 
-  isObjectMethod(node: Node): boolean {
+  isObjectMethod(node: Node): node is ObjectMethod {
     return node.type === "ObjectMethod";
   }
 
@@ -343,9 +349,9 @@ export default abstract class UtilParser extends Tokenizer {
   }
 
   enterInitialScopes() {
-    let paramFlags = PARAM;
+    let paramFlags = ParamKind.PARAM;
     if (this.inModule) {
-      paramFlags |= PARAM_AWAIT;
+      paramFlags |= ParamKind.PARAM_AWAIT;
     }
     this.scope.enter(ScopeFlag.PROGRAM);
     this.prodParam.enter(paramFlags);

@@ -4,11 +4,11 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports["default"] = void 0;
-var Foo = /*#__PURE__*/function () {
+var Foo = exports["default"] = /*#__PURE__*/function () {
   function Foo() {
     babelHelpers.classCallCheck(this, Foo);
   }
-  babelHelpers.createClass(Foo, [{
+  return babelHelpers.createClass(Foo, [{
     key: "bar",
     value: function () {
       var _bar = babelHelpers.asyncToGenerator( /*#__PURE__*/babelHelpers.regeneratorRuntime().mark(function _callee() {
@@ -29,9 +29,7 @@ var Foo = /*#__PURE__*/function () {
       return bar;
     }()
   }]);
-  return Foo;
 }();
-exports["default"] = Foo;
 function foo() {
   return _foo.apply(this, arguments);
 }

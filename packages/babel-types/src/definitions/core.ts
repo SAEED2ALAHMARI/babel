@@ -1,7 +1,7 @@
-import is from "../validators/is";
-import isValidIdentifier from "../validators/isValidIdentifier";
+import is from "../validators/is.ts";
+import isValidIdentifier from "../validators/isValidIdentifier.ts";
 import { isKeyword, isReservedWord } from "@babel/helper-validator-identifier";
-import type * as t from "..";
+import type * as t from "../index.ts";
 import { readStringContents } from "@babel/helper-string-parser";
 
 import {
@@ -10,7 +10,7 @@ import {
   ASSIGNMENT_OPERATORS,
   UNARY_OPERATORS,
   UPDATE_OPERATORS,
-} from "../constants";
+} from "../constants/index.ts";
 
 import {
   defineAliasedType,
@@ -24,7 +24,7 @@ import {
   assertOneOf,
   validateOptional,
   type Validator,
-} from "./utils";
+} from "./utils.ts";
 
 const defineType = defineAliasedType("Standardized");
 
@@ -63,10 +63,11 @@ defineType("AssignmentExpression", {
     },
     left: {
       validate: !process.env.BABEL_TYPES_8_BREAKING
-        ? assertNodeType("LVal")
+        ? assertNodeType("LVal", "OptionalMemberExpression")
         : assertNodeType(
             "Identifier",
             "MemberExpression",
+            "OptionalMemberExpression",
             "ArrayPattern",
             "ObjectPattern",
             "TSAsExpression",
@@ -185,12 +186,7 @@ defineType("CallExpression", {
       validate: chain(
         assertValueType("array"),
         assertEach(
-          assertNodeType(
-            "Expression",
-            "SpreadElement",
-            "JSXNamespacedName",
-            "ArgumentPlaceholder",
-          ),
+          assertNodeType("Expression", "SpreadElement", "ArgumentPlaceholder"),
         ),
       ),
     },
@@ -755,9 +751,6 @@ defineType("Program", {
   visitor: ["directives", "body"],
   builder: ["body", "directives", "sourceType", "interpreter"],
   fields: {
-    sourceFile: {
-      validate: assertValueType("string"),
-    },
     sourceType: {
       validate: assertOneOf("script", "module"),
       default: "script",
@@ -1378,8 +1371,6 @@ defineType("ClassExpression", {
   fields: {
     id: {
       validate: assertNodeType("Identifier"),
-      // In declarations, this is missing if this is the
-      // child of an ExportDefaultDeclaration.
       optional: true,
     },
     typeParameters: {
@@ -1439,6 +1430,9 @@ defineType("ClassDeclaration", {
   fields: {
     id: {
       validate: assertNodeType("Identifier"),
+      // The id may be omitted if this is the child of an
+      // ExportDefaultDeclaration.
+      optional: true,
     },
     typeParameters: {
       validate: process.env.BABEL_8_BREAKING
@@ -1743,6 +1737,10 @@ defineType("ImportDeclaration", {
       optional: true,
       validate: assertValueType("boolean"),
     },
+    phase: {
+      default: null,
+      validate: assertOneOf("source", "defer"),
+    },
     specifiers: {
       validate: chain(
         assertValueType("array"),
@@ -1801,6 +1799,24 @@ defineType("ImportSpecifier", {
       // Handle Flowtype's extension "import {typeof foo} from"
       // And TypeScript's "import { type foo } from"
       validate: assertOneOf("type", "typeof", "value"),
+      optional: true,
+    },
+  },
+});
+
+defineType("ImportExpression", {
+  visitor: ["source", "options"],
+  aliases: ["Expression"],
+  fields: {
+    phase: {
+      default: null,
+      validate: assertOneOf("source", "defer"),
+    },
+    source: {
+      validate: assertNodeType("Expression"),
+    },
+    options: {
+      validate: assertNodeType("Expression"),
       optional: true,
     },
   },
@@ -1872,6 +1888,7 @@ export const classMethodOrPropertyCommon = () => ({
           "Identifier",
           "StringLiteral",
           "NumericLiteral",
+          "BigIntLiteral",
         );
         const computed = assertNodeType("Expression");
 
@@ -2220,12 +2237,7 @@ defineType("OptionalCallExpression", {
       validate: chain(
         assertValueType("array"),
         assertEach(
-          assertNodeType(
-            "Expression",
-            "SpreadElement",
-            "JSXNamespacedName",
-            "ArgumentPlaceholder",
-          ),
+          assertNodeType("Expression", "SpreadElement", "ArgumentPlaceholder"),
         ),
       ),
     },

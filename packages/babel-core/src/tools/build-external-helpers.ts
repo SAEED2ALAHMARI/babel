@@ -23,12 +23,11 @@ import {
   variableDeclarator,
 } from "@babel/types";
 import type * as t from "@babel/types";
-import File from "../transformation/file/file";
-import type { PublicReplacements } from "@babel/template/src/options";
+import type { Replacements } from "@babel/template";
 
 // Wrapped to avoid wasting time parsing this when almost no-one uses
 // build-external-helpers.
-const buildUmdWrapper = (replacements: PublicReplacements) =>
+const buildUmdWrapper = (replacements: Replacements) =>
   template.statement`
     (function (root, factory) {
       if (typeof define === "function" && define.amd) {
@@ -170,12 +169,28 @@ function buildHelpers(
 
   const refs: { [key: string]: t.Identifier | t.MemberExpression } = {};
   helpers.list.forEach(function (name) {
-    if (allowlist && allowlist.indexOf(name) < 0) return;
+    if (allowlist && !allowlist.includes(name)) return;
 
     const ref = (refs[name] = getHelperReference(name));
 
-    helpers.ensure(name, File);
-    const { nodes } = helpers.get(name, getHelperReference, ref);
+    const { nodes } = helpers.get(
+      name,
+      getHelperReference,
+      namespace ? null : `_${name}`,
+      [],
+      namespace
+        ? (ast, exportName, mapExportBindingAssignments) => {
+            mapExportBindingAssignments(node =>
+              assignmentExpression("=", ref, node),
+            );
+            ast.body.push(
+              expressionStatement(
+                assignmentExpression("=", ref, identifier(exportName)),
+              ),
+            );
+          }
+        : null,
+    );
 
     body.push(...nodes);
   });

@@ -1,12 +1,11 @@
-import type { Options } from "../options";
-import type * as N from "../types";
+import type { Options } from "../options.ts";
 import type { CommentWhitespace } from "../parser/comments";
-import { Position } from "../util/location";
+import { Position } from "../util/location.ts";
 
-import { types as ct, type TokContext } from "./context";
-import { tt, type TokenType } from "./types";
-import type { Errors } from "../parse-error";
-import type { ParseError } from "../parse-error";
+import { types as ct, type TokContext } from "./context.ts";
+import { tt, type TokenType } from "./types.ts";
+import type { Errors } from "../parse-error.ts";
+import type { ParseError } from "../parse-error.ts";
 
 export type DeferredStrictError =
   | typeof Errors.StrictNumericEscape
@@ -24,8 +23,18 @@ type TopicContextState = {
   maxTopicIndex: null | 0;
 };
 
+export const enum LoopLabelKind {
+  Loop = 1,
+  Switch = 2,
+}
+
+declare const bit: import("../../../../scripts/babel-plugin-bit-decorator/types.d.ts").BitDecorator<State>;
+
 export default class State {
-  strict: boolean;
+  @bit.storage flags: number;
+
+  @bit accessor strict = false;
+
   curLine: number;
   lineStart: number;
 
@@ -39,8 +48,8 @@ export default class State {
       strictMode === false
         ? false
         : strictMode === true
-        ? true
-        : sourceType === "module";
+          ? true
+          : sourceType === "module";
 
     this.curLine = startLine;
     this.lineStart = -startColumn;
@@ -67,13 +76,13 @@ export default class State {
   noArrowParamsConversionAt: number[] = [];
 
   // Flags to track
-  maybeInArrowParameters: boolean = false;
-  inType: boolean = false;
-  noAnonFunctionType: boolean = false;
-  hasFlowComment: boolean = false;
-  isAmbientContext: boolean = false;
-  inAbstractClass: boolean = false;
-  inDisallowConditionalTypesContext: boolean = false;
+  @bit accessor maybeInArrowParameters = false;
+  @bit accessor inType = false;
+  @bit accessor noAnonFunctionType = false;
+  @bit accessor hasFlowComment = false;
+  @bit accessor isAmbientContext = false;
+  @bit accessor inAbstractClass = false;
+  @bit accessor inDisallowConditionalTypesContext = false;
 
   // For the Hack-style pipelines plugin
   topicContext: TopicContextState = {
@@ -82,19 +91,17 @@ export default class State {
   };
 
   // For the F#-style pipelines plugin
-  soloAwait: boolean = false;
-  inFSharpPipelineDirectBody: boolean = false;
+  @bit accessor soloAwait = false;
+  @bit accessor inFSharpPipelineDirectBody = false;
 
   // Labels in scope.
   labels: Array<{
-    kind: "loop" | "switch" | undefined | null;
+    kind: LoopLabelKind;
     name?: string | null;
     statementStart?: number;
   }> = [];
 
-  // Comment store for Program.comments
-  comments: Array<N.Comment> = [];
-
+  commentsLen = 0;
   // Comment attachment store
   commentStack: Array<CommentWhitespace> = [];
 
@@ -117,18 +124,18 @@ export default class State {
   lastTokEndLoc: Position = null;
   // this is initialized when generating the second token.
   lastTokStartLoc: Position = null;
-  lastTokStart: number = 0;
 
   // The context stack is used to track whether the apostrophe "`" starts
   // or ends a string template
   context: Array<TokContext> = [ct.brace];
+
   // Used to track whether a JSX element is allowed to form
-  canStartJSXElement: boolean = true;
+  @bit accessor canStartJSXElement = true;
 
   // Used to signal to callers of `readWord1` whether the word
   // contained any escape sequences. This is needed because words with
   // escape sequences must not be interpreted as keywords.
-  containsEsc: boolean = false;
+  @bit accessor containsEsc = false;
 
   // Used to track invalid escape sequences in template literals,
   // that must be reported if the template is not tagged.
@@ -147,24 +154,41 @@ export default class State {
   // Tokens length in token store
   tokensLength: number = 0;
 
+  /**
+   * When we add a new property, we must manually update the `clone` method
+   * @see State#clone
+   */
+
   curPosition(): Position {
     return new Position(this.curLine, this.pos - this.lineStart, this.pos);
   }
 
-  clone(skipArrays?: boolean): State {
+  clone(): State {
     const state = new State();
-    const keys = Object.keys(this) as (keyof State)[];
-    for (let i = 0, length = keys.length; i < length; i++) {
-      const key = keys[i];
-      let val = this[key];
-
-      if (!skipArrays && Array.isArray(val)) {
-        val = val.slice();
-      }
-
-      // @ts-expect-error val must conform to S[key]
-      state[key] = val;
-    }
+    state.flags = this.flags;
+    state.curLine = this.curLine;
+    state.lineStart = this.lineStart;
+    state.startLoc = this.startLoc;
+    state.endLoc = this.endLoc;
+    state.errors = this.errors.slice();
+    state.potentialArrowAt = this.potentialArrowAt;
+    state.noArrowAt = this.noArrowAt.slice();
+    state.noArrowParamsConversionAt = this.noArrowParamsConversionAt.slice();
+    state.topicContext = this.topicContext;
+    state.labels = this.labels.slice();
+    state.commentsLen = this.commentsLen;
+    state.commentStack = this.commentStack.slice();
+    state.pos = this.pos;
+    state.type = this.type;
+    state.value = this.value;
+    state.start = this.start;
+    state.end = this.end;
+    state.lastTokEndLoc = this.lastTokEndLoc;
+    state.lastTokStartLoc = this.lastTokStartLoc;
+    state.context = this.context.slice();
+    state.firstInvalidTemplateEscapePos = this.firstInvalidTemplateEscapePos;
+    state.strictErrors = this.strictErrors;
+    state.tokensLength = this.tokensLength;
 
     return state;
   }

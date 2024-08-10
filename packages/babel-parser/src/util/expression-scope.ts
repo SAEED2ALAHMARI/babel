@@ -1,7 +1,7 @@
-import { Errors, type ParseErrorConstructor } from "../parse-error";
-import type { Position } from "./location";
-import type { Node } from "../types";
-import type Tokenizer from "../tokenizer";
+import { Errors, type ParseErrorConstructor } from "../parse-error.ts";
+import type { Position } from "./location.ts";
+import type { Node } from "../types.ts";
+import type Tokenizer from "../tokenizer/index.ts";
 
 /**
  * @module util/expression-scope
@@ -82,7 +82,7 @@ type ArrowHeadParsingDeclarationError =
   | typeof Errors.AwaitBindingIdentifier;
 
 class ArrowHeadParsingScope extends ExpressionScope {
-  declarationErrors: Map<number, [ParseErrorConstructor<{}>, Position]> =
+  declarationErrors: Map<number, [ParseErrorConstructor<object>, Position]> =
     new Map();
   constructor(
     type:
@@ -92,12 +92,8 @@ class ArrowHeadParsingScope extends ExpressionScope {
     super(type);
   }
   recordDeclarationError(
-    ParsingErrorClass: ParseErrorConstructor<{}>,
-    {
-      at,
-    }: {
-      at: Position;
-    },
+    ParsingErrorClass: ParseErrorConstructor<object>,
+    at: Position,
   ) {
     const index = at.index;
 
@@ -137,13 +133,9 @@ export default class ExpressionScopeHandler {
    */
   recordParameterInitializerError(
     toParseError: ArrowHeadParsingParameterInitializerError,
-    {
-      at: node,
-    }: {
-      at: Node;
-    },
+    node: Node,
   ): void {
-    const origin = { at: node.loc.start };
+    const origin = node.loc.start;
     const { stack } = this;
     let i = stack.length - 1;
     let scope: ExpressionScope = stack[i];
@@ -180,16 +172,12 @@ export default class ExpressionScopeHandler {
    * expression and can not be cast to pattern
    */
   recordArrowParameterBindingError(
-    error: ParseErrorConstructor<{}>,
-    {
-      at: node,
-    }: {
-      at: Node;
-    },
+    error: ParseErrorConstructor<object>,
+    node: Node,
   ): void {
     const { stack } = this;
     const scope: ExpressionScope = stack[stack.length - 1];
-    const origin = { at: node.loc.start };
+    const origin = node.loc.start;
     if (scope.isCertainlyParameterDeclaration()) {
       this.parser.raise(error, origin);
     } else if (scope.canBeArrowParameterDeclaration()) {
@@ -205,7 +193,7 @@ export default class ExpressionScopeHandler {
    * Errors will be recorded to any ancestry MaybeAsyncArrowParameterDeclaration
    * scope until an Expression scope is seen.
    */
-  recordAsyncArrowParametersError({ at }: { at: Position }): void {
+  recordAsyncArrowParametersError(at: Position): void {
     const { stack } = this;
     let i = stack.length - 1;
     let scope: ExpressionScope = stack[i];
@@ -213,7 +201,7 @@ export default class ExpressionScopeHandler {
       if (
         scope.type === ExpressionScopeType.kMaybeAsyncArrowParameterDeclaration
       ) {
-        scope.recordDeclarationError(Errors.AwaitBindingIdentifier, { at });
+        scope.recordDeclarationError(Errors.AwaitBindingIdentifier, at);
       }
       scope = stack[--i];
     }
@@ -224,7 +212,7 @@ export default class ExpressionScopeHandler {
     const currentScope = stack[stack.length - 1];
     if (!currentScope.canBeArrowParameterDeclaration()) return;
     currentScope.iterateErrors(([toParseError, loc]) => {
-      this.parser.raise(toParseError, { at: loc });
+      this.parser.raise(toParseError, loc);
       // iterate from parent scope
       let i = stack.length - 2;
       let scope = stack[i];

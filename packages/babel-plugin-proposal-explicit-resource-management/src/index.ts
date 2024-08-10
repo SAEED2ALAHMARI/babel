@@ -1,7 +1,7 @@
 import { declare } from "@babel/helper-plugin-utils";
 import syntaxExplicitResourceManagement from "@babel/plugin-syntax-explicit-resource-management";
-import { types as t, template, traverse, type PluginPass } from "@babel/core";
-import type { NodePath, Visitor } from "@babel/traverse";
+import { types as t, template, traverse } from "@babel/core";
+import type { NodePath, Visitor, PluginPass } from "@babel/core";
 
 const enum USING_KIND {
   NORMAL,
@@ -9,7 +9,7 @@ const enum USING_KIND {
 }
 
 export default declare(api => {
-  api.assertVersion("^7.22.0");
+  api.assertVersion(REQUIRED_VERSION("^7.22.0"));
 
   const TOP_LEVEL_USING = new Map<t.Node, USING_KIND>();
 
@@ -43,38 +43,96 @@ export default declare(api => {
       path: NodePath<t.BlockStatement | t.StaticBlock>,
       state,
     ) {
-      let stackId: t.Identifier | null = null;
-      let needsAwait = false;
+      if (process.env.BABEL_8_BREAKING || state.availableHelper("usingCtx")) {
+        let ctx: t.Identifier | null = null;
+        let needsAwait = false;
 
-      for (const node of path.node.body) {
-        if (!isUsingDeclaration(node)) continue;
-        stackId ??= path.scope.generateUidIdentifier("stack");
-        const isAwaitUsing =
-          node.kind === "await using" ||
-          TOP_LEVEL_USING.get(node) === USING_KIND.AWAIT;
-        needsAwait ||= isAwaitUsing;
+        for (const node of path.node.body) {
+          if (!isUsingDeclaration(node)) continue;
+          ctx ??= path.scope.generateUidIdentifier("usingCtx");
+          const isAwaitUsing =
+            node.kind === "await using" ||
+            TOP_LEVEL_USING.get(node) === USING_KIND.AWAIT;
+          needsAwait ||= isAwaitUsing;
 
-        if (!TOP_LEVEL_USING.delete(node)) {
-          node.kind = "const";
+          if (!TOP_LEVEL_USING.delete(node)) {
+            node.kind = "const";
+          }
+          for (const decl of node.declarations) {
+            decl.init = t.callExpression(
+              t.memberExpression(
+                t.cloneNode(ctx),
+                isAwaitUsing ? t.identifier("a") : t.identifier("u"),
+              ),
+              [decl.init],
+            );
+          }
         }
-        node.declarations.forEach(decl => {
-          const args = [t.cloneNode(stackId), decl.init];
-          if (isAwaitUsing) args.push(t.booleanLiteral(true));
-          decl.init = t.callExpression(state.addHelper("using"), args);
-        });
-      }
-      if (!stackId) return;
+        if (!ctx) return;
 
-      const errorId = path.scope.generateUidIdentifier("error");
-      const hasErrorId = path.scope.generateUidIdentifier("hasError");
+        const disposeCall = t.callExpression(
+          t.memberExpression(t.cloneNode(ctx), t.identifier("d")),
+          [],
+        );
 
-      let disposeCall: t.Expression = t.callExpression(
-        state.addHelper("dispose"),
-        [t.cloneNode(stackId), t.cloneNode(errorId), t.cloneNode(hasErrorId)],
-      );
-      if (needsAwait) disposeCall = t.awaitExpression(disposeCall);
+        const replacement = template.statement.ast`
+        try {
+          var ${t.cloneNode(ctx)} = ${state.addHelper("usingCtx")}();
+          ${path.node.body}
+        } catch (_) {
+          ${t.cloneNode(ctx)}.e = _;
+        } finally {
+          ${needsAwait ? t.awaitExpression(disposeCall) : disposeCall}
+        }
+      ` as t.TryStatement;
 
-      const replacement = template.statement.ast`
+        t.inherits(replacement, path.node);
+
+        const { parentPath } = path;
+        if (
+          parentPath.isFunction() ||
+          parentPath.isTryStatement() ||
+          parentPath.isCatchClause()
+        ) {
+          path.replaceWith(t.blockStatement([replacement]));
+        } else if (path.isStaticBlock()) {
+          path.node.body = [replacement];
+        } else {
+          path.replaceWith(replacement);
+        }
+      } else {
+        let stackId: t.Identifier | null = null;
+        let needsAwait = false;
+
+        for (const node of path.node.body) {
+          if (!isUsingDeclaration(node)) continue;
+          stackId ??= path.scope.generateUidIdentifier("stack");
+          const isAwaitUsing =
+            node.kind === "await using" ||
+            TOP_LEVEL_USING.get(node) === USING_KIND.AWAIT;
+          needsAwait ||= isAwaitUsing;
+
+          if (!TOP_LEVEL_USING.delete(node)) {
+            node.kind = "const";
+          }
+          node.declarations.forEach(decl => {
+            const args = [t.cloneNode(stackId), decl.init];
+            if (isAwaitUsing) args.push(t.booleanLiteral(true));
+            decl.init = t.callExpression(state.addHelper("using"), args);
+          });
+        }
+        if (!stackId) return;
+
+        const errorId = path.scope.generateUidIdentifier("error");
+        const hasErrorId = path.scope.generateUidIdentifier("hasError");
+
+        let disposeCall: t.Expression = t.callExpression(
+          state.addHelper("dispose"),
+          [t.cloneNode(stackId), t.cloneNode(errorId), t.cloneNode(hasErrorId)],
+        );
+        if (needsAwait) disposeCall = t.awaitExpression(disposeCall);
+
+        const replacement = template.statement.ast`
         try {
           var ${stackId} = [];
           ${path.node.body}
@@ -84,20 +142,86 @@ export default declare(api => {
         } finally {
           ${disposeCall}
         }
-      `;
+      ` as t.TryStatement;
 
-      const { parentPath } = path;
-      if (
-        parentPath.isFunction() ||
-        parentPath.isTryStatement() ||
-        parentPath.isCatchClause()
-      ) {
-        path.replaceWith(t.blockStatement([replacement]));
-      } else if (path.isStaticBlock()) {
-        path.node.body = [replacement];
-      } else {
-        path.replaceWith(replacement);
+        t.inherits(replacement.block, path.node);
+
+        const { parentPath } = path;
+        if (
+          parentPath.isFunction() ||
+          parentPath.isTryStatement() ||
+          parentPath.isCatchClause()
+        ) {
+          path.replaceWith(t.blockStatement([replacement]));
+        } else if (path.isStaticBlock()) {
+          path.node.body = [replacement];
+        } else {
+          path.replaceWith(replacement);
+        }
       }
+    },
+    SwitchStatement(path, state) {
+      let ctx: t.Identifier | null = null;
+      let needsAwait = false;
+
+      const { cases } = path.node;
+      for (const c of cases) {
+        for (const stmt of c.consequent) {
+          if (isUsingDeclaration(stmt)) {
+            if (
+              !process.env.BABEL_8_BREAKING &&
+              !state.availableHelper("usingCtx")
+            ) {
+              path.traverse({
+                VariableDeclaration(path) {
+                  const { node } = path;
+                  if (!isUsingDeclaration(node)) return;
+                  throw path.buildCodeFrameError(
+                    "`using` declarations inside `switch` statements are not supported by your current `@babel/core` version, please update to a more recent one",
+                  );
+                },
+              });
+            }
+
+            ctx ??= path.scope.generateUidIdentifier("usingCtx");
+
+            const isAwaitUsing = stmt.kind === "await using";
+            needsAwait ||= isAwaitUsing;
+
+            stmt.kind = "const";
+            for (const decl of stmt.declarations) {
+              decl.init = t.callExpression(
+                t.memberExpression(
+                  t.cloneNode(ctx),
+                  isAwaitUsing ? t.identifier("a") : t.identifier("u"),
+                ),
+                [decl.init],
+              );
+            }
+          }
+        }
+      }
+      if (!ctx) return;
+
+      const disposeCall = t.callExpression(
+        t.memberExpression(t.cloneNode(ctx), t.identifier("d")),
+        [],
+      );
+
+      const replacement = template.statement.ast`
+        try {
+          var ${t.cloneNode(ctx)} = ${state.addHelper("usingCtx")}();
+          ${path.node}
+        } catch (_) {
+          ${t.cloneNode(ctx)}.e = _;
+        } finally {
+          ${needsAwait ? t.awaitExpression(disposeCall) : disposeCall}
+        }
+      ` as t.TryStatement;
+
+      t.inherits(replacement, path.node);
+
+      path.replaceWith(replacement);
     },
   };
 
@@ -133,7 +257,7 @@ export default declare(api => {
               continue;
             }
 
-            let { node } = stmt;
+            let node: t.Statement | t.Declaration = stmt.node;
             let shouldRemove = true;
 
             if (stmt.isExportDefaultDeclaration()) {

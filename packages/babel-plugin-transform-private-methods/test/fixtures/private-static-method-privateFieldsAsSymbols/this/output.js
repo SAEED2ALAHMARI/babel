@@ -1,11 +1,11 @@
-var _class;
+var _B;
 class A {
   static get a() {
     return 1;
   }
 }
-var _getA = /*#__PURE__*/Symbol("getA");
-var _getB = /*#__PURE__*/Symbol("getB");
+var _getA = Symbol("getA");
+var _getB = Symbol("getB");
 class B extends A {
   static get b() {
     return 2;
@@ -14,9 +14,9 @@ class B extends A {
     return [babelHelpers.classPrivateFieldLooseBase(this, _getA)[_getA], babelHelpers.classPrivateFieldLooseBase(this, _getB)[_getB]];
   }
 }
-_class = B;
+_B = B;
 function _getA2() {
-  return babelHelpers.get(babelHelpers.getPrototypeOf(_class), "a", this);
+  return babelHelpers.get(babelHelpers.getPrototypeOf(_B), "a", this);
 }
 function _getB2() {
   return this.b;

@@ -7,7 +7,7 @@ export interface Options {
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { helperVersion = "7.0.0-beta.0", whitelist = false } = options;
 

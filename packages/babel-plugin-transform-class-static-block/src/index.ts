@@ -1,5 +1,5 @@
 import { declare } from "@babel/helper-plugin-utils";
-import type { Scope } from "@babel/traverse";
+import type { Scope } from "@babel/core";
 
 import {
   enableFeature,
@@ -24,17 +24,16 @@ function generateUid(scope: Scope, denyList: Set<string>) {
   return uid;
 }
 
-export default declare(({ types: t, template, assertVersion }) => {
-  assertVersion("^7.12.0");
+export default declare(({ types: t, template, assertVersion, version }) => {
+  assertVersion(REQUIRED_VERSION("^7.12.0"));
 
   return {
     name: "transform-class-static-block",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-class-static-block").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-class-static-block").default,
 
     pre() {
       // Enable this in @babel/helper-create-class-features-plugin, so that it

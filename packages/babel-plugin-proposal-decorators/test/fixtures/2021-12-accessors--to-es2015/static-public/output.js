@@ -1,40 +1,37 @@
-var _init_a, _init_b, _computedKey, _init_computedKey, _initStatic, _class;
+var _Foo;
+let _initStatic, _init_a, _init_b, _init_computedKey;
 const dec = () => {};
-_computedKey = 'c';
 class Foo {
   static get a() {
-    return babelHelpers.classStaticPrivateFieldSpecGet(this, Foo, _A);
+    return babelHelpers.assertClassBrand(Foo, this, _A)._;
   }
   static set a(v) {
-    babelHelpers.classStaticPrivateFieldSpecSet(this, Foo, _A, v);
+    _A._ = babelHelpers.assertClassBrand(Foo, this, v);
   }
   static get b() {
-    return babelHelpers.classStaticPrivateFieldSpecGet(this, Foo, _B);
+    return babelHelpers.assertClassBrand(Foo, this, _B)._;
   }
   static set b(v) {
-    babelHelpers.classStaticPrivateFieldSpecSet(this, Foo, _B, v);
+    _B._ = babelHelpers.assertClassBrand(Foo, this, v);
   }
-  static get [_computedKey]() {
-    return babelHelpers.classStaticPrivateFieldSpecGet(this, Foo, _C);
+  static get ['c']() {
+    return babelHelpers.assertClassBrand(Foo, this, _C)._;
   }
-  static set [_computedKey](v) {
-    babelHelpers.classStaticPrivateFieldSpecSet(this, Foo, _C, v);
+  static set ['c'](v) {
+    _C._ = babelHelpers.assertClassBrand(Foo, this, v);
   }
 }
-_class = Foo;
+_Foo = Foo;
 (() => {
-  [_init_a, _init_b, _init_computedKey, _initStatic] = babelHelpers.applyDecs(_class, [[dec, 6, "a"], [dec, 6, "b"], [dec, 6, _computedKey]], []);
-  _initStatic(_class);
+  [_init_a, _init_b, _init_computedKey, _initStatic] = babelHelpers.applyDecs(_Foo, [[dec, 6, "a"], [dec, 6, "b"], [dec, 6, 'c']], []);
+  _initStatic(_Foo);
 })();
 var _A = {
-  writable: true,
-  value: _init_a(_class)
+  _: _init_a(_Foo)
 };
 var _B = {
-  writable: true,
-  value: _init_b(_class, 123)
+  _: _init_b(_Foo, 123)
 };
 var _C = {
-  writable: true,
-  value: _init_computedKey(_class, 456)
+  _: _init_computedKey(_Foo, 456)
 };

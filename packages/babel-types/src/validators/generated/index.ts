@@ -5,16 +5,16 @@
 
 /* eslint-disable no-fallthrough */
 
-import shallowEqual from "../../utils/shallowEqual";
-import type * as t from "../..";
-import deprecationWarning from "../../utils/deprecationWarning";
+import shallowEqual from "../../utils/shallowEqual.ts";
+import type * as t from "../../index.ts";
+import deprecationWarning from "../../utils/deprecationWarning.ts";
 
 type Opts<Obj> = Partial<{
   [Prop in keyof Obj]: Obj[Prop] extends t.Node
     ? t.Node
     : Obj[Prop] extends t.Node[]
-    ? t.Node[]
-    : Obj[Prop];
+      ? t.Node[]
+      : Obj[Prop];
 }>;
 
 export function isArrayExpression(
@@ -674,6 +674,16 @@ export function isImportSpecifier(
   if (!node) return false;
 
   if (node.type !== "ImportSpecifier") return false;
+
+  return opts == null || shallowEqual(node, opts);
+}
+export function isImportExpression(
+  node: t.Node | null | undefined,
+  opts?: Opts<t.ImportExpression> | null,
+): node is t.ImportExpression {
+  if (!node) return false;
+
+  if (node.type !== "ImportExpression") return false;
 
   return opts == null || shallowEqual(node, opts);
 }
@@ -2580,6 +2590,7 @@ export function isStandardized(
     case "ImportDefaultSpecifier":
     case "ImportNamespaceSpecifier":
     case "ImportSpecifier":
+    case "ImportExpression":
     case "MetaProperty":
     case "ClassMethod":
     case "ObjectPattern":
@@ -2649,6 +2660,7 @@ export function isExpression(
     case "UpdateExpression":
     case "ArrowFunctionExpression":
     case "ClassExpression":
+    case "ImportExpression":
     case "MetaProperty":
     case "Super":
     case "TaggedTemplateExpression":

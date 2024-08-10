@@ -5,13 +5,14 @@
 import buildDebug from "debug";
 import path from "path";
 import type { Handler } from "gensync";
-import { isAsync } from "../../gensync-utils/async";
-import loadCodeDefault, { supportsESM } from "./module-types";
+import { isAsync } from "../../gensync-utils/async.ts";
+import loadCodeDefault, { supportsESM } from "./module-types.ts";
 import { fileURLToPath, pathToFileURL } from "url";
 
-import importMetaResolve from "./import-meta-resolve";
+import { resolve as importMetaResolve } from "../../vendor/import-meta-resolve.js";
 
 import { createRequire } from "module";
+import { existsSync } from "fs";
 const require = createRequire(import.meta.url);
 
 const debug = buildDebug("babel:config:loading:files:plugins");
@@ -146,8 +147,8 @@ function tryRequireResolve(
 }
 
 function tryImportMetaResolve(
-  id: Parameters<ImportMeta["resolve"]>[0],
-  options: Parameters<ImportMeta["resolve"]>[1],
+  id: Parameters<typeof importMetaResolve>[0],
+  options: Parameters<typeof importMetaResolve>[1],
 ): Result<string> {
   try {
     return { error: null, value: importMetaResolve(id, options) };
@@ -196,7 +197,15 @@ function resolveStandardizedName(
   }
 
   try {
-    return resolveStandardizedNameForImport(type, name, dirname);
+    const resolved = resolveStandardizedNameForImport(type, name, dirname);
+    // import-meta-resolve 4.0 does not throw if the module is not found.
+    if (!existsSync(resolved)) {
+      throw Object.assign(
+        new Error(`Could not resolve "${name}" in file ${dirname}.`),
+        { type: "MODULE_NOT_FOUND" },
+      );
+    }
+    return resolved;
   } catch (e) {
     try {
       return resolveStandardizedNameForRequire(type, name, dirname);

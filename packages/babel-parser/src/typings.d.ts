@@ -8,6 +8,7 @@ export type Plugin =
   | "classStaticBlock" // Enabled by default
   | "decimal"
   | "decorators-legacy"
+  | "deferredImportEvaluation"
   | "decoratorAutoAccessors"
   | "destructuringPrivate"
   | "doExpressions"
@@ -36,6 +37,7 @@ export type Plugin =
   | "placeholders"
   | "privateIn" // Enabled by default
   | "regexpUnicodeSets" // Enabled by default
+  | "sourcePhaseImports"
   | "throwExpressions"
   | "topLevelAwait"
   | "v8intrinsic"
@@ -47,6 +49,7 @@ export type ParserPluginWithOptions =
   | ["importAttributes", { deprecatedAssertSyntax: boolean }]
   // @deprecated
   | ["moduleAttributes", { version: "may-2020" }]
+  | ["optionalChainingAssign", { version: "2023-07" }]
   | ["pipelineOperator", PipelineOperatorPluginOptions]
   | ["recordAndTuple", RecordAndTuplePluginOptions]
   | ["flow", FlowPluginOptions]

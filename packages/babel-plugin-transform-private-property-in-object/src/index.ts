@@ -6,14 +6,13 @@ import {
   buildCheckInRHS,
 } from "@babel/helper-create-class-features-plugin";
 import annotateAsPure from "@babel/helper-annotate-as-pure";
-import type * as t from "@babel/types";
-import type { NodePath, Scope } from "@babel/traverse";
+import type { NodePath, Scope, types as t } from "@babel/core";
 
 export interface Options {
   loose?: boolean;
 }
 export default declare((api, opt: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
   const { types: t, template } = api;
   const { loose } = opt;
 
@@ -83,7 +82,7 @@ export default declare((api, opt: Options) => {
   }
 
   function getWeakSetId<Ref extends t.Node>(
-    weakSets: WeakMap<Ref, t.Identifier>,
+    weakSets: WeakMap<t.Node, t.Identifier>,
     outerClass: NodePath<t.Class>,
     reference: NodePath<Ref>,
     name = "",
@@ -112,12 +111,11 @@ export default declare((api, opt: Options) => {
 
   return {
     name: "transform-private-property-in-object",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-private-property-in-object").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-private-property-in-object").default,
     pre() {
       // Enable this in @babel/helper-create-class-features-plugin, so that it
       // can be handled by the private fields and methods transform.

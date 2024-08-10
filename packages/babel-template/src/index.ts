@@ -1,5 +1,5 @@
-import * as formatters from "./formatters";
-import createTemplateBuilder from "./builder";
+import * as formatters from "./formatters.ts";
+import createTemplateBuilder from "./builder.ts";
 
 export const smart = createTemplateBuilder(formatters.smart);
 export const statement = createTemplateBuilder(formatters.statement);
@@ -23,3 +23,8 @@ export default Object.assign(smart.bind(undefined) as DefaultTemplateBuilder, {
   program,
   ast: smart.ast,
 });
+
+export type {
+  PublicOpts as Options,
+  PublicReplacements as Replacements,
+} from "./options.ts";

@@ -1,9 +1,9 @@
 /*:: declare var invariant; */
 
-import BaseParser from "./base";
-import type { Comment, Node, Identifier } from "../types";
+import BaseParser from "./base.ts";
+import type { Comment, Node, Identifier } from "../types.ts";
 import * as charCodes from "charcodes";
-import type { Undone } from "./node";
+import type { Undone } from "./node.ts";
 
 /**
  * A whitespace token containing comments
@@ -102,7 +102,12 @@ function adjustInnerComments(
 export default class CommentsParser extends BaseParser {
   addComment(comment: Comment): void {
     if (this.filename) comment.loc.filename = this.filename;
-    this.state.comments.push(comment);
+    const { commentsLen } = this.state;
+    if (this.comments.length !== commentsLen) {
+      this.comments.length = commentsLen;
+    }
+    this.comments.push(comment);
+    this.state.commentsLen++;
   }
 
   /**

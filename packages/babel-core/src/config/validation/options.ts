@@ -1,9 +1,9 @@
 import type { InputTargets, Targets } from "@babel/helper-compilation-targets";
 
-import type { ConfigItem } from "../item";
-import type Plugin from "../plugin";
+import type { ConfigItem } from "../item.ts";
+import type Plugin from "../plugin.ts";
 
-import removed from "./removed";
+import removed from "./removed.ts";
 import {
   msg,
   access,
@@ -25,13 +25,17 @@ import {
   assertSourceType,
   assertTargets,
   assertAssumptions,
-} from "./option-assertions";
-import type { ValidatorSet, Validator, OptionPath } from "./option-assertions";
-import type { UnloadedDescriptor } from "../config-descriptors";
-import type { PluginAPI } from "../helpers/config-api";
+} from "./option-assertions.ts";
+import type {
+  ValidatorSet,
+  Validator,
+  OptionPath,
+} from "./option-assertions.ts";
+import type { UnloadedDescriptor } from "../config-descriptors.ts";
+import type { PluginAPI } from "../helpers/config-api.ts";
 import type { ParserOptions } from "@babel/parser";
 import type { GeneratorOptions } from "@babel/generator";
-import ConfigError from "../../errors/config-error";
+import ConfigError from "../../errors/config-error.ts";
 
 const ROOT_VALIDATORS: ValidatorSet = {
   cwd: assertString as Validator<ValidatedOptions["cwd"]>,
@@ -229,7 +233,7 @@ export type BabelrcSearch = boolean | IgnoreItem | IgnoreList;
 export type SourceMapsOption = boolean | "inline" | "both";
 export type SourceTypeOption = "module" | "script" | "unambiguous";
 export type CompactOption = boolean | "auto";
-export type RootInputSourceMapOption = {} | boolean;
+export type RootInputSourceMapOption = object | boolean;
 export type RootMode = "root" | "upward" | "upward-optional";
 
 export type TargetsListOrObject =
@@ -277,6 +281,7 @@ const knownAssumptions = [
   "noDocumentAll",
   "noIncompleteNsImportDetection",
   "noNewArrows",
+  "noUninitializedPrivateFieldAccess",
   "objectRestNoSymbols",
   "privateFieldsAsSymbols",
   "privateFieldsAsProperties",
@@ -297,7 +302,7 @@ function getSource(loc: NestingPath): OptionsSource {
 
 export function validate(
   type: OptionsSource,
-  opts: {},
+  opts: any,
   filename?: string,
 ): ValidatedOptions {
   try {
@@ -380,7 +385,6 @@ function throwUnknownError(loc: OptionPath) {
       `Using removed Babel ${version} option: ${msg(loc)} - ${message}`,
     );
   } else {
-    // eslint-disable-next-line max-len
     const unknownOptErr = new Error(
       `Unknown option: ${msg(
         loc,
@@ -393,12 +397,8 @@ function throwUnknownError(loc: OptionPath) {
   }
 }
 
-function has(obj: {}, key: string) {
-  return Object.prototype.hasOwnProperty.call(obj, key);
-}
-
-function assertNoDuplicateSourcemap(opts: {}): void {
-  if (has(opts, "sourceMap") && has(opts, "sourceMaps")) {
+function assertNoDuplicateSourcemap(opts: any): void {
+  if (Object.hasOwn(opts, "sourceMap") && Object.hasOwn(opts, "sourceMaps")) {
     throw new Error(".sourceMap is an alias for .sourceMaps, cannot use both");
   }
 }

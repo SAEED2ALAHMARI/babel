@@ -28,11 +28,13 @@ module.exports = [
     },
     rules: {
       curly: ["error", "multi-line"],
+      eqeqeq: ["error", "smart"],
       "linebreak-style": ["error", "unix"],
       "no-case-declarations": "error",
       "no-confusing-arrow": "error",
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-process-exit": "error",
+      "no-unused-vars": ["error", { caughtErrors: "none" }],
       "no-var": "error",
       "prefer-const": "error",
     },

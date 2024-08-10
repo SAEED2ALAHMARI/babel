@@ -21,11 +21,11 @@ import type {
   RootMode,
   TargetsListOrObject,
   AssumptionName,
-} from "./options";
+} from "./options.ts";
 
-import { assumptionsNames } from "./options";
+import { assumptionsNames } from "./options.ts";
 
-export type { RootPath } from "./options";
+export type { RootPath } from "./options.ts";
 
 export type ValidatorSet = {
   [name: string]: Validator<any>;
@@ -175,7 +175,7 @@ export function assertCallerMetadata(
 export function assertInputSourceMap(
   loc: OptionPath,
   value: unknown,
-): RootInputSourceMapOption | void {
+): RootInputSourceMapOption {
   if (
     value !== undefined &&
     typeof value !== "boolean" &&
@@ -183,7 +183,7 @@ export function assertInputSourceMap(
   ) {
     throw new Error(`${msg(loc)} must be a boolean, object, or undefined`);
   }
-  return value;
+  return value as RootInputSourceMapOption;
 }
 
 export function assertString(loc: GeneralPath, value: unknown): string | void {
@@ -427,7 +427,7 @@ export function assertTargets(
 
     if (key === "esmodules") assertBoolean(subLoc, val);
     else if (key === "browsers") assertBrowsersList(subLoc, val);
-    else if (!Object.hasOwnProperty.call(TargetNames, key)) {
+    else if (!Object.hasOwn(TargetNames, key)) {
       const validTargets = Object.keys(TargetNames).join(", ");
       throw new Error(
         `${msg(

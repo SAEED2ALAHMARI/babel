@@ -1,12 +1,12 @@
 import { declare } from "@babel/helper-plugin-utils";
 import remapAsyncToGenerator from "@babel/helper-remap-async-to-generator";
-import type { NodePath, Visitor } from "@babel/traverse";
-import { traverse, types as t, type PluginPass } from "@babel/core";
-import rewriteForAwait from "./for-await";
+import type { NodePath, Visitor, PluginPass } from "@babel/core";
+import { traverse, types as t } from "@babel/core";
+import rewriteForAwait from "./for-await.ts";
 import environmentVisitor from "@babel/helper-environment-visitor";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const yieldStarVisitor = traverse.visitors.merge<PluginPass>([
     {
@@ -94,12 +94,11 @@ export default declare(api => {
 
   return {
     name: "transform-async-generator-functions",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-async-generators").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-async-generators").default,
 
     visitor: {
       Program(path, state) {

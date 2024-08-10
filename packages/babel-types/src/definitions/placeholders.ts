@@ -1,4 +1,4 @@
-import { ALIAS_KEYS } from "./utils";
+import { ALIAS_KEYS } from "./utils.ts";
 
 export const PLACEHOLDERS = [
   "Identifier",
@@ -25,7 +25,7 @@ export const PLACEHOLDERS_FLIPPED_ALIAS: Record<string, string[]> = {};
 
 Object.keys(PLACEHOLDERS_ALIAS).forEach(type => {
   PLACEHOLDERS_ALIAS[type].forEach(alias => {
-    if (!Object.hasOwnProperty.call(PLACEHOLDERS_FLIPPED_ALIAS, alias)) {
+    if (!Object.hasOwn(PLACEHOLDERS_FLIPPED_ALIAS, alias)) {
       PLACEHOLDERS_FLIPPED_ALIAS[alias] = [];
     }
     PLACEHOLDERS_FLIPPED_ALIAS[alias].push(type);

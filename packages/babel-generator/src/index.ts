@@ -1,48 +1,13 @@
-import SourceMap from "./source-map";
-import Printer from "./printer";
+import SourceMap from "./source-map.ts";
+import Printer from "./printer.ts";
 import type * as t from "@babel/types";
 import type { Opts as jsescOptions } from "jsesc";
-import type { Format } from "./printer";
-import type {
-  RecordAndTuplePluginOptions,
-  PipelineOperatorPluginOptions,
-} from "@babel/parser";
+import type { Format } from "./printer.ts";
 import type {
   EncodedSourceMap,
   DecodedSourceMap,
   Mapping,
 } from "@jridgewell/gen-mapping";
-
-/**
- * Babel's code generator, turns an ast into code, maintaining sourcemaps,
- * user preferences, and valid output.
- */
-
-class Generator extends Printer {
-  constructor(
-    ast: t.Node,
-    opts: GeneratorOptions = {},
-    code: string | { [filename: string]: string },
-  ) {
-    const format = normalizeOptions(code, opts);
-    const map = opts.sourceMaps ? new SourceMap(opts, code) : null;
-    super(format, map);
-
-    this.ast = ast;
-  }
-
-  ast: t.Node;
-
-  /**
-   * Generate code and sourcemap from ast.
-   *
-   * Appends comments that weren't attached to any node to the end of the generated output.
-   */
-
-  generate() {
-    return super.generate(this.ast);
-  }
-}
 
 /**
  * Normalize generator options, setting defaults.
@@ -75,7 +40,6 @@ function normalizeOptions(
       minimal: process.env.BABEL_8_BREAKING ? true : false,
       ...opts.jsescOption,
     },
-    recordAndTupleSyntaxType: opts.recordAndTupleSyntaxType ?? "hash",
     topicToken: opts.topicToken,
     importAttributesKeyword: opts.importAttributesKeyword,
   };
@@ -83,6 +47,7 @@ function normalizeOptions(
   if (!process.env.BABEL_8_BREAKING) {
     format.decoratorsBeforeExport = opts.decoratorsBeforeExport;
     format.jsescOption.json = opts.jsonCompatibleStrings;
+    format.recordAndTupleSyntaxType = opts.recordAndTupleSyntaxType ?? "hash";
   }
 
   if (format.minified) {
@@ -221,14 +186,15 @@ export interface GeneratorOptions {
 
   /**
    * For use with the recordAndTuple token.
+   * @deprecated It will be removed in Babel 8.
    */
-  recordAndTupleSyntaxType?: RecordAndTuplePluginOptions["syntaxType"];
+  recordAndTupleSyntaxType?: "bar" | "hash";
 
   /**
    * For use with the Hack-style pipe operator.
    * Changes what token is used for pipe bodies’ topic references.
    */
-  topicToken?: PipelineOperatorPluginOptions["topicToken"];
+  topicToken?: "%" | "#" | "@@" | "^^" | "^";
 
   /**
    * The import attributes syntax style:
@@ -246,20 +212,29 @@ export interface GeneratorResult {
   rawMappings: Mapping[] | undefined;
 }
 
-/**
- * We originally exported the Generator class above, but to make it extra clear that it is a private API,
- * we have moved that to an internal class instance and simplified the interface to the two public methods
- * that we wish to support.
- */
+if (!process.env.BABEL_8_BREAKING && !USE_ESM) {
+  /**
+   * We originally exported the Generator class above, but to make it extra clear that it is a private API,
+   * we have moved that to an internal class instance and simplified the interface to the two public methods
+   * that we wish to support.
+   */
 
-export class CodeGenerator {
-  private _generator: Generator;
-  constructor(ast: t.Node, opts?: GeneratorOptions, code?: string) {
-    this._generator = new Generator(ast, opts, code);
-  }
-  generate(): GeneratorResult {
-    return this._generator.generate();
-  }
+  // eslint-disable-next-line no-restricted-globals
+  exports.CodeGenerator = class CodeGenerator {
+    private _ast: t.Node;
+    private _format: Format | undefined;
+    private _map: SourceMap | null;
+    constructor(ast: t.Node, opts: GeneratorOptions = {}, code?: string) {
+      this._ast = ast;
+      this._format = normalizeOptions(code, opts);
+      this._map = opts.sourceMaps ? new SourceMap(opts, code) : null;
+    }
+    generate(): GeneratorResult {
+      const printer = new Printer(this._format, this._map);
+
+      return printer.generate(this._ast);
+    }
+  };
 }
 
 /**
@@ -271,9 +246,13 @@ export class CodeGenerator {
  */
 export default function generate(
   ast: t.Node,
-  opts?: GeneratorOptions,
+  opts: GeneratorOptions = {},
   code?: string | { [filename: string]: string },
-) {
-  const gen = new Generator(ast, opts, code);
-  return gen.generate();
+): GeneratorResult {
+  const format = normalizeOptions(code, opts);
+  const map = opts.sourceMaps ? new SourceMap(opts, code) : null;
+
+  const printer = new Printer(format, map);
+
+  return printer.generate(ast);
 }

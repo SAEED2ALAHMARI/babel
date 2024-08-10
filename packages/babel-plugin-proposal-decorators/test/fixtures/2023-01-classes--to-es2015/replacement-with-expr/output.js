@@ -1,8 +1,9 @@
-var _initClass, _Bar, _class;
+var _Bar2;
+let _initClass, _Bar;
 const dec = () => {};
-const Foo = ((_class = class Bar {
+const Foo = ((_Bar2 = class Bar {
   constructor() {
     babelHelpers.defineProperty(this, "bar", new _Bar());
   }
-}, [_Bar, _initClass] = babelHelpers.applyDecs2301(_class, [], [dec]).c, _initClass()), _Bar);
+}, [_Bar, _initClass] = babelHelpers.applyDecs2301(_Bar2, [], [dec]).c, _initClass()), _Bar);
 const foo = new Foo();

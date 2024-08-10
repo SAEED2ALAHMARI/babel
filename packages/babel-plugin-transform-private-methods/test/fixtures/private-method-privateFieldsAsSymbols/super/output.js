@@ -1,10 +1,10 @@
-var _class;
+var _Sub;
 class Base {
   superMethod() {
     return 'good';
   }
 }
-var _privateMethod = /*#__PURE__*/Symbol("privateMethod");
+var _privateMethod = Symbol("privateMethod");
 class Sub extends Base {
   constructor(...args) {
     super(...args);
@@ -19,7 +19,7 @@ class Sub extends Base {
     return babelHelpers.classPrivateFieldLooseBase(this, _privateMethod)[_privateMethod]();
   }
 }
-_class = Sub;
+_Sub = Sub;
 function _privateMethod2() {
-  return babelHelpers.get(babelHelpers.getPrototypeOf(_class.prototype), "superMethod", this).call(this);
+  return babelHelpers.get(babelHelpers.getPrototypeOf(_Sub.prototype), "superMethod", this).call(this);
 }

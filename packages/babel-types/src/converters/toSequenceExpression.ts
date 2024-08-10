@@ -1,6 +1,13 @@
-import gatherSequenceExpressions from "./gatherSequenceExpressions";
-import type * as t from "..";
-import type { DeclarationInfo } from "./gatherSequenceExpressions";
+// TODO(Babel 8) Remove this file
+if (process.env.BABEL_8_BREAKING) {
+  throw new Error(
+    "Internal Babel error: This file should only be loaded in Babel 7",
+  );
+}
+
+import gatherSequenceExpressions from "./gatherSequenceExpressions.ts";
+import type * as t from "../index.ts";
+import type { DeclarationInfo } from "./gatherSequenceExpressions.ts";
 
 /**
  * Turn an array of statement `nodes` into a `SequenceExpression`.
@@ -17,7 +24,7 @@ export default function toSequenceExpression(
   if (!nodes?.length) return;
 
   const declars: DeclarationInfo[] = [];
-  const result = gatherSequenceExpressions(nodes, scope, declars);
+  const result = gatherSequenceExpressions(nodes, declars);
   if (!result) return;
 
   for (const declar of declars) {

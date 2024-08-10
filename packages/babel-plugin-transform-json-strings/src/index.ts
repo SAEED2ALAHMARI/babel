@@ -1,9 +1,8 @@
 import { declare } from "@babel/helper-plugin-utils";
-import type * as t from "@babel/types";
-import type { NodePath } from "@babel/traverse";
+import type { NodePath, types as t } from "@babel/core";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
   const regex = /(\\*)([\u2028\u2029])/g;
   function replace(match: string, escapes: string, separator: string) {
     // If there's an odd number, that means the separator itself was escaped.
@@ -17,12 +16,11 @@ export default declare(api => {
 
   return {
     name: "transform-json-strings",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-json-strings").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-json-strings").default,
 
     visitor: {
       "DirectiveLiteral|StringLiteral"({

@@ -1,4 +1,5 @@
-import * as virtualTypes from "./path/lib/virtual-types";
+import * as virtualTypes from "./path/lib/virtual-types.ts";
+import * as virtualTypesValidators from "./path/lib/virtual-types-validator.ts";
 import type { Node } from "@babel/types";
 import {
   DEPRECATED_KEYS,
@@ -7,8 +8,8 @@ import {
   TYPES,
   __internal__deprecationWarning as deprecationWarning,
 } from "@babel/types";
-import type { ExplodedVisitor, NodePath, Visitor } from "./index";
-import type { ExplVisitNode, VisitNodeFunction, VisitPhase } from "./types";
+import type { ExplodedVisitor, NodePath, Visitor } from "./index.ts";
+import type { ExplVisitNode, VisitNodeFunction, VisitPhase } from "./types.ts";
 
 type VIRTUAL_TYPES = keyof typeof virtualTypes;
 function isVirtualType(type: string): type is VIRTUAL_TYPES {
@@ -27,6 +28,12 @@ export function isExplodedVisitor(
   return visitor?._exploded;
 }
 
+// We need to name this function `explode$1` because otherwise rollup-plugin-dts
+// will generate a `namespace traverse { var explode: typeof explode; }` when
+// bundling @babel/traverse's index.d.ts.
+// TODO: Just call it `explode` once https://github.com/Swatinem/rollup-plugin-dts/issues/307
+// is fixed.
+export { explode$1 as explode };
 /**
  * explode() will take a visitor object with all of the various shorthands
  * that we support, and validates & normalizes it into a common format, ready
@@ -42,7 +49,7 @@ export function isExplodedVisitor(
  * * `enter` and `exit` functions are wrapped in arrays, to ease merging of
  *   visitors
  */
-export function explode<S>(visitor: Visitor<S>): ExplodedVisitor<S> {
+function explode$1<S>(visitor: Visitor<S>): ExplodedVisitor<S> {
   if (isExplodedVisitor(visitor)) return visitor;
   // @ts-expect-error `visitor` will be cast to ExplodedVisitor by this function
   visitor._exploded = true;
@@ -64,7 +71,7 @@ export function explode<S>(visitor: Visitor<S>): ExplodedVisitor<S> {
   }
 
   // verify data structure
-  verify(visitor);
+  verify$1(visitor);
 
   // make sure there's no __esModule type since this is because we're using loose mode
   // and it sets __esModule to be enumerable on all modules :(
@@ -137,7 +144,6 @@ export function explode<S>(visitor: Visitor<S>): ExplodedVisitor<S> {
       if (existing) {
         mergePair(existing, fns);
       } else {
-        // @ts-expect-error Expression produces a union type that is too complex to represent.
         visitor[alias] = { ...fns };
       }
     }
@@ -156,7 +162,13 @@ export function explode<S>(visitor: Visitor<S>): ExplodedVisitor<S> {
   return visitor as ExplodedVisitor;
 }
 
-export function verify(visitor: Visitor) {
+// We need to name this function `verify$1` because otherwise rollup-plugin-dts
+// will generate a `namespace traverse { var verify: typeof verify; }` when
+// bundling @babel/traverse's index.d.ts.
+// TODO: Just call it `verify` once https://github.com/Swatinem/rollup-plugin-dts/issues/307
+// is fixed.
+export { verify$1 as verify };
+function verify$1(visitor: Visitor) {
   // @ts-expect-error _verified is not defined on non-verified Visitor.
   // TODO: unify _verified and _exploded.
   if (visitor._verified) return;
@@ -175,7 +187,7 @@ export function verify(visitor: Visitor) {
 
     if (shouldIgnoreKey(nodeType)) continue;
 
-    if (TYPES.indexOf(nodeType) < 0) {
+    if (!TYPES.includes(nodeType)) {
       throw new Error(
         `You gave us a visitor for the node type ${nodeType} but it's not a valid type`,
       );
@@ -236,7 +248,7 @@ export function merge(
   const mergedVisitor: ExplodedVisitor = {};
 
   for (let i = 0; i < visitors.length; i++) {
-    const visitor = explode(visitors[i]);
+    const visitor = explode$1(visitors[i]);
     const state = states[i];
 
     let topVisitor: ExplVisitNode<unknown, Node> = visitor;
@@ -330,9 +342,11 @@ function ensureCallbackArrays(obj: Visitor) {
 }
 
 function wrapCheck(nodeType: VIRTUAL_TYPES, fn: Function) {
+  const fnKey = `is${nodeType}`;
+  // @ts-expect-error we know virtualTypesValidators will contain `fnKey`, but TS doesn't
+  const validator = virtualTypesValidators[fnKey];
   const newFn = function (this: unknown, path: NodePath) {
-    // @ts-expect-error: Expression produces a union type that is too complex to represent.
-    if (path[`is${nodeType}`]()) {
+    if (validator.call(path)) {
       return fn.apply(this, arguments);
     }
   };

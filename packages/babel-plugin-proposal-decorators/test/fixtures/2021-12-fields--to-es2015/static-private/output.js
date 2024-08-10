@@ -1,21 +1,20 @@
-var _init_a, _init_b, _class;
+var _Foo;
+let _init_a, _init_b;
 const dec = () => {};
 class Foo {}
-_class = Foo;
-[_init_a, _init_b] = babelHelpers.applyDecs(_class, [[dec, 5, "a", function () {
-  return babelHelpers.classStaticPrivateFieldSpecGet(this, _class, _a);
+_Foo = Foo;
+[_init_a, _init_b] = babelHelpers.applyDecs(_Foo, [[dec, 5, "a", function () {
+  return babelHelpers.assertClassBrand(_Foo, this, _a)._;
 }, function (value) {
-  babelHelpers.classStaticPrivateFieldSpecSet(this, _class, _a, value);
+  _a._ = babelHelpers.assertClassBrand(_Foo, this, value);
 }], [dec, 5, "b", function () {
-  return babelHelpers.classStaticPrivateFieldSpecGet(this, _class, _b);
+  return babelHelpers.assertClassBrand(_Foo, this, _b)._;
 }, function (value) {
-  babelHelpers.classStaticPrivateFieldSpecSet(this, _class, _b, value);
+  _b._ = babelHelpers.assertClassBrand(_Foo, this, value);
 }]], []);
 var _a = {
-  writable: true,
-  value: _init_a(_class)
+  _: _init_a(_Foo)
 };
 var _b = {
-  writable: true,
-  value: _init_b(_class, 123)
+  _: _init_b(_Foo, 123)
 };

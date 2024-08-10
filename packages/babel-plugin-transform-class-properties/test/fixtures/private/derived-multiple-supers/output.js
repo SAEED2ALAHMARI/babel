@@ -1,26 +1,19 @@
 var _bar = /*#__PURE__*/new WeakMap();
-var Foo = /*#__PURE__*/function (_Bar) {
+let Foo = /*#__PURE__*/function (_Bar) {
   "use strict";
 
-  babelHelpers.inherits(Foo, _Bar);
-  var _super = babelHelpers.createSuper(Foo);
   function Foo() {
     var _this;
     babelHelpers.classCallCheck(this, Foo);
     if (condition) {
-      _this = _super.call(this);
-      babelHelpers.classPrivateFieldInitSpec(babelHelpers.assertThisInitialized(_this), _bar, {
-        writable: true,
-        value: "foo"
-      });
+      _this = babelHelpers.callSuper(this, Foo);
+      babelHelpers.classPrivateFieldInitSpec(babelHelpers.assertThisInitialized(_this), _bar, "foo");
     } else {
-      _this = _super.call(this);
-      babelHelpers.classPrivateFieldInitSpec(babelHelpers.assertThisInitialized(_this), _bar, {
-        writable: true,
-        value: "foo"
-      });
+      _this = babelHelpers.callSuper(this, Foo);
+      babelHelpers.classPrivateFieldInitSpec(babelHelpers.assertThisInitialized(_this), _bar, "foo");
     }
-    return babelHelpers.possibleConstructorReturn(_this);
+    return babelHelpers.assertThisInitialized(_this);
   }
+  babelHelpers.inherits(Foo, _Bar);
   return babelHelpers.createClass(Foo);
 }(Bar);

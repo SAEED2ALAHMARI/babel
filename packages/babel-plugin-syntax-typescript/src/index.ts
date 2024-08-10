@@ -25,7 +25,7 @@ export interface Options {
 }
 
 export default declare((api, opts: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { disallowAmbiguousJSXLike, dts } = opts;
 

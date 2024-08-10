@@ -30,8 +30,8 @@ import {
 import type * as t from "@babel/types";
 import environmentVisitor from "@babel/helper-environment-visitor";
 import nameFunction from "@babel/helper-function-name";
-import { merge as mergeVisitors } from "../visitors";
-import type NodePath from "./index";
+import { merge as mergeVisitors } from "../visitors.ts";
+import type NodePath from "./index.ts";
 
 export function toComputedKey(this: NodePath) {
   let key;
@@ -55,7 +55,7 @@ export function ensureBlock(
   this: NodePath<
     t.Loop | t.WithStatement | t.Function | t.LabeledStatement | t.CatchClause
   >,
-) {
+): void {
   const body = this.get("body");
   const bodyNode = body.node;
 
@@ -67,6 +67,11 @@ export function ensureBlock(
   }
 
   if (body.isBlockStatement()) {
+    // @ts-expect-error TS throws because ensureBlock returns the body node path
+    // however, we don't use the return value and treat it as a transform and
+    // assertion utilities. For better type inference we annotate it as an
+    // assertion method
+    // TODO: Unify the implementation with the type definition
     return bodyNode;
   }
 
@@ -102,21 +107,24 @@ export function ensureBlock(
     key,
   );
 
+  // @ts-expect-error TS throws because ensureBlock returns the body node path
+  // however, we don't use the return value and treat it as a transform and
+  // assertion utilities. For better type inference we annotate it as an
+  // assertion method
+  // TODO: Unify the implementation with the type definition
   return this.node;
 }
 
-if (!process.env.BABEL_8_BREAKING) {
-  if (!USE_ESM) {
-    /**
-     * Keeping this for backward-compatibility. You should use arrowFunctionToExpression() for >=7.x.
-     */
-    // eslint-disable-next-line no-restricted-globals
-    exports.arrowFunctionToShadowed = function (this: NodePath) {
-      if (!this.isArrowFunctionExpression()) return;
+if (!process.env.BABEL_8_BREAKING && !USE_ESM) {
+  /**
+   * Keeping this for backward-compatibility. You should use arrowFunctionToExpression() for >=7.x.
+   */
+  // eslint-disable-next-line no-restricted-globals
+  exports.arrowFunctionToShadowed = function (this: NodePath) {
+    if (!this.isArrowFunctionExpression()) return;
 
-      this.arrowFunctionToExpression();
-    };
-  }
+    this.arrowFunctionToExpression();
+  };
 }
 
 /**
@@ -179,7 +187,6 @@ export function arrowFunctionToExpression(
     allowInsertArrowWithRest,
   );
 
-  // @ts-expect-error TS requires explicit fn type annotation
   fn.ensureBlock();
   setType(fn, "FunctionExpression");
 
@@ -210,7 +217,7 @@ export function arrowFunctionToExpression(
       callExpression(
         memberExpression(
           // @ts-expect-error TS can't infer nameFunction returns CallExpression | ArrowFunctionExpression here
-          nameFunction(this, true) || fn.node,
+          nameFunction(this) || fn.node,
           identifier("bind"),
         ),
         [checkBinding ? identifier(checkBinding.name) : thisExpression()],
@@ -556,7 +563,7 @@ function standardizeSuperProperty(
 
     return [
       assignmentPath.get("left") as NodePath<t.MemberExpression>,
-      assignmentPath.get("right").get("left"),
+      assignmentPath.get("right").get("left") as NodePath<t.MemberExpression>,
     ];
   } else if (superProp.parentPath.isUpdateExpression()) {
     const updateExpr = superProp.parentPath;

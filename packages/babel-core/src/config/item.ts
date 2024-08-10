@@ -1,10 +1,10 @@
 import type { Handler } from "gensync";
-import type { PluginTarget, PluginOptions } from "./validation/options";
+import type { PluginTarget, PluginOptions } from "./validation/options.ts";
 
 import path from "path";
-import { createDescriptor } from "./config-descriptors";
+import { createDescriptor } from "./config-descriptors.ts";
 
-import type { UnloadedDescriptor } from "./config-descriptors";
+import type { UnloadedDescriptor } from "./config-descriptors.ts";
 
 export function createItemFromDescriptor<API>(
   desc: UnloadedDescriptor<API>,
@@ -77,7 +77,7 @@ class ConfigItem<API> {
   /**
    * The resolved value of the item itself.
    */
-  value: {} | Function;
+  value: object | Function;
 
   /**
    * The options, if any, that were passed to the item.
@@ -85,7 +85,7 @@ class ConfigItem<API> {
    *
    * "false" means that this item has been disabled.
    */
-  options: {} | void | false;
+  options: object | void | false;
 
   /**
    * The directory that the options for this item are relative to.

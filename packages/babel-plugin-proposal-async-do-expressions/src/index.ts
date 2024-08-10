@@ -1,10 +1,10 @@
 import { declare } from "@babel/helper-plugin-utils";
 import syntaxAsyncDoExpressions from "@babel/plugin-syntax-async-do-expressions";
 import hoistVariables from "@babel/helper-hoist-variables";
-import type * as t from "@babel/types";
+import type { types as t } from "@babel/core";
 
 export default declare(({ types: t, assertVersion }) => {
-  assertVersion("^7.13.0");
+  assertVersion(REQUIRED_VERSION("^7.13.0"));
 
   return {
     name: "proposal-async-do-expressions",

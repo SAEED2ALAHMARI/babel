@@ -138,7 +138,7 @@ const es2018 = {
   "transform-object-rest-spread": "object rest/spread properties",
 
   "transform-dotall-regex": "s (dotAll) flag for regular expressions",
-  "transform-unicode-property-regex": "RegExp Unicode Property Escapes",
+  "transform-unicode-property-regex": "RegExp Unicode Property Escapes / basic",
   "transform-named-capturing-groups-regex": "RegExp named capture groups",
 };
 
@@ -158,14 +158,23 @@ const es2021 = {
 };
 
 const es2022 = {
+  "bugfix/transform-v8-static-class-fields-redefine-readonly": {
+    features: ["static class fields / static class fields use [[Define]]"],
+    replaces: "transform-class-properties",
+  },
+  "bugfix/transform-firefox-class-in-computed-class-key": {
+    replaces: "transform-class-properties",
+    overwrite: {
+      // TODO: Once Firefox releases the fix, write the correct version here.
+      firefox: undefined,
+    },
+  },
   "transform-class-static-block": "Class static initialization blocks",
   "transform-private-property-in-object":
     "Ergonomic brand checks for private fields",
   "transform-class-properties": {
     features: [
-      "static class fields / public static class fields",
-      "static class fields / private static class fields",
-      "static class fields / computed static class fields",
+      "static class fields",
       "instance class fields / public instance class fields",
       "instance class fields / private instance class fields basic support",
       "instance class fields / computed instance class fields",
@@ -175,7 +184,14 @@ const es2022 = {
 };
 
 const es2024 = {
-  "transform-unicode-sets-regex": "RegExp `v` flag",
+  "transform-unicode-sets-regex": {
+    features: [
+      "RegExp `v` flag / set notations",
+      "RegExp `v` flag / properties of Strings",
+      "RegExp `v` flag / constructor supports it",
+      "RegExp `v` flag / shows up in flags",
+    ],
+  },
 };
 
 const shippedProposal = {};

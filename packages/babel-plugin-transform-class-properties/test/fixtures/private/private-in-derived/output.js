@@ -1,19 +1,15 @@
 var _outer = /*#__PURE__*/new WeakMap();
-var Outer = /*#__PURE__*/babelHelpers.createClass(function Outer() {
+let Outer = /*#__PURE__*/babelHelpers.createClass(function Outer() {
   "use strict";
 
   babelHelpers.classCallCheck(this, Outer);
-  babelHelpers.classPrivateFieldInitSpec(this, _outer, {
-    writable: true,
-    value: void 0
-  });
-  var Test = /*#__PURE__*/function (_babelHelpers$classPr) {
-    babelHelpers.inherits(Test, _babelHelpers$classPr);
-    var _super = babelHelpers.createSuper(Test);
+  babelHelpers.classPrivateFieldInitSpec(this, _outer, void 0);
+  let Test = /*#__PURE__*/function (_babelHelpers$classPr) {
     function Test() {
       babelHelpers.classCallCheck(this, Test);
-      return _super.apply(this, arguments);
+      return babelHelpers.callSuper(this, Test, arguments);
     }
+    babelHelpers.inherits(Test, _babelHelpers$classPr);
     return babelHelpers.createClass(Test);
-  }(babelHelpers.classPrivateFieldGet(this, _outer));
+  }(babelHelpers.classPrivateFieldGet2(_outer, this));
 });

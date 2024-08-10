@@ -1,8 +1,8 @@
 // Heavily inspired by
 // https://github.com/airbnb/babel-plugin-dynamic-import-node/blob/master/src/utils.js
 
-import type { NodePath } from "@babel/traverse";
-import { types as t, template, type File } from "@babel/core";
+import type { File, NodePath } from "@babel/core";
+import { types as t, template } from "@babel/core";
 import { buildDynamicImport } from "@babel/helper-module-transforms";
 
 const requireNoInterop = (source: t.Expression) =>
@@ -14,7 +14,7 @@ const requireInterop = (source: t.Expression, file: File) =>
   ]);
 
 export function transformDynamicImport(
-  path: NodePath<t.CallExpression>,
+  path: NodePath<t.CallExpression | t.ImportExpression>,
   noInterop: boolean,
   file: File,
 ) {

@@ -1,6 +1,6 @@
 // This file contains methods responsible for dealing with comments.
 import type * as t from "@babel/types";
-import type NodePath from "./index";
+import type NodePath from "./index.ts";
 import {
   addComment as _addComment,
   addComments as _addComments,
@@ -47,12 +47,10 @@ export function shareCommentsWithSiblings(this: NodePath) {
 }
 
 function removeIfExisting<T>(list: T[], toRemove?: T[]): T[] {
-  if (!toRemove) return list;
-  let lastFoundIndex = -1;
+  if (!toRemove?.length) return list;
+  const set = new Set(toRemove);
   return list.filter(el => {
-    const i = toRemove.indexOf(el, lastFoundIndex);
-    if (i === -1) return true;
-    lastFoundIndex = i;
+    return !set.has(el);
   });
 }
 

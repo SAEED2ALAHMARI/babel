@@ -11,12 +11,12 @@ import {
   validateOptional,
   validateOptionalType,
   validateType,
-} from "./utils";
+} from "./utils.ts";
 import {
   functionDeclarationCommon,
   classMethodOrDeclareMethodCommon,
-} from "./core";
-import is from "../validators/is";
+} from "./core.ts";
+import is from "../validators/is.ts";
 
 const defineType = defineAliasedType("TypeScript");
 
@@ -97,7 +97,7 @@ defineType("TSQualifiedName", {
 const signatureDeclarationCommon = () => ({
   typeParameters: validateOptionalType("TSTypeParameterDeclaration"),
   [process.env.BABEL_8_BREAKING ? "params" : "parameters"]: validateArrayOfType(
-    ["Identifier", "RestElement"],
+    ["ArrayPattern", "Identifier", "ObjectPattern", "RestElement"],
   ),
   [process.env.BABEL_8_BREAKING ? "returnType" : "typeAnnotation"]:
     validateOptionalType("TSTypeAnnotation"),
@@ -127,12 +127,11 @@ const namedTypeElementCommon = () => ({
 
 defineType("TSPropertySignature", {
   aliases: ["TSTypeElement"],
-  visitor: ["key", "typeAnnotation", "initializer"],
+  visitor: ["key", "typeAnnotation"],
   fields: {
     ...namedTypeElementCommon(),
     readonly: validateOptional(bool),
     typeAnnotation: validateOptionalType("TSTypeAnnotation"),
-    initializer: validateOptionalType("Expression"),
     kind: {
       validate: assertOneOf("get", "set"),
     },
@@ -531,6 +530,10 @@ defineType("TSImportType", {
     argument: validateType("StringLiteral"),
     qualifier: validateOptionalType("TSEntityName"),
     typeParameters: validateOptionalType("TSTypeParameterInstantiation"),
+    options: {
+      validate: assertNodeType("Expression"),
+      optional: true,
+    },
   },
 });
 

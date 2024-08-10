@@ -1,6 +1,6 @@
 {
   "name": "@babel/traverse",
-  "version": "7.22.10",
+  "version": "7.24.8",
   "description": "The Babel Traverse module maintains the overall tree state, and is responsible for replacing, removing, and adding nodes",
   "author": "The Babel Team (https://babel.dev/team)",
   "homepage": "https://babel.dev/docs/en/next/babel-traverse",
@@ -24,8 +24,8 @@
     "@babel/helper-split-export-declaration": "workspace:^",
     "@babel/parser": "workspace:^",
     "@babel/types": "workspace:^",
-    "debug": "^4.1.0",
-    "globals": "condition:BABEL_8_BREAKING ? ^13.5.0 : ^11.1.0"
+    "debug": "^4.3.1",
+    "globals": "condition:BABEL_8_BREAKING ? ^15.6.0 : ^11.1.0"
   },
   "devDependencies": {
     "@babel/core": "workspace:^",
@@ -38,7 +38,7 @@
     "BABEL_8_BREAKING": [
       {
         "engines": {
-          "node": "^16.20.0 || ^18.16.0 || >=20.0.0"
+          "node": "^18.20.0 || ^20.10.0 || >=21.0.0"
         }
       },
       {
@@ -46,15 +46,18 @@
       }
     ],
     "USE_ESM": [
+      null,
       {
-        "type": "module"
-      },
-      null
+        "type": "commonjs"
+      }
     ]
   },
   "exports": {
-    ".": "./lib/index.js",
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
     "./package.json": "./package.json"
   },
-  "type": "commonjs"
+  "type": "module"
 }

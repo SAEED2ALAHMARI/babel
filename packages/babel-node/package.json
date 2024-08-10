@@ -1,6 +1,6 @@
 {
   "name": "@babel/node",
-  "version": "7.22.10",
+  "version": "7.24.8",
   "description": "Babel command line",
   "author": "The Babel Team (https://babel.dev/team)",
   "homepage": "https://babel.dev/docs/en/next/babel-node",
@@ -24,24 +24,21 @@
   ],
   "dependencies": {
     "@babel/register": "workspace:^",
-    "commander": "^4.0.1",
+    "commander": "condition:BABEL_8_BREAKING ? ^12.1.0 : ^6.2.0 (esm:program|default)",
     "core-js": "^3.30.2",
-    "node-environment-flags": "^1.0.5",
+    "node-environment-flags": "condition:BABEL_8_BREAKING ? : ^1.0.5",
     "regenerator-runtime": "^0.14.0",
-    "v8flags": "^3.1.1"
+    "v8flags": "condition:BABEL_8_BREAKING ? ^4.0.0 : ^3.1.1"
   },
   "peerDependencies": {
     "@babel/core": "^7.0.0-0"
   },
   "devDependencies": {
     "@babel/core": "workspace:^",
-    "@babel/helper-fixtures": "workspace:^",
+    "@babel/helper-transform-fixture-test-runner": "workspace:^",
     "@babel/preset-env": "workspace:^",
     "@babel/runtime": "workspace:^",
-    "@types/v8flags": "^3.1.1",
-    "fs-readdir-recursive": "^1.0.0",
-    "make-dir": "condition:BABEL_8_BREAKING ? : ^2.1.0",
-    "rimraf": "^3.0.0"
+    "@types/v8flags": "^3.1.1"
   },
   "bin": {
     "babel-node": "./bin/babel-node.js"
@@ -53,7 +50,7 @@
     "BABEL_8_BREAKING": [
       {
         "engines": {
-          "node": "^16.20.0 || ^18.16.0 || >=20.0.0"
+          "node": "^18.20.0 || ^20.10.0 || >=21.0.0"
         }
       },
       {
@@ -61,15 +58,18 @@
       }
     ],
     "USE_ESM": [
+      null,
       {
-        "type": "module"
-      },
-      null
+        "type": "commonjs"
+      }
     ]
   },
   "exports": {
-    ".": "./lib/index.js",
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
     "./package.json": "./package.json"
   },
-  "type": "commonjs"
+  "type": "module"
 }

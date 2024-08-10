@@ -1,9 +1,9 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { type MutatorMap, pushAccessor, toDefineObject } from "./define-map";
+import { type MutatorMap, pushAccessor, toDefineObject } from "./define-map.ts";
 import { types as t } from "@babel/core";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   return {
     name: "transform-property-mutators",

@@ -16,16 +16,15 @@ bundler handle dynamic imports.
 `;
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   return {
     name: "transform-dynamic-import",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-dynamic-import").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-dynamic-import").default,
 
     pre() {
       // We keep using the old name, for compatibility with older

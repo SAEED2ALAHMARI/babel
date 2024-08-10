@@ -1,13 +1,37 @@
-import type NodePath from "./index";
+import type NodePath from "./index.ts";
 import type * as t from "@babel/types";
 
 // This file contains Babels metainterpreter that can evaluate static code.
 
-const VALID_CALLEES = ["String", "Number", "Math"] as const;
+const VALID_OBJECT_CALLEES = ["Number", "String", "Math"] as const;
+const VALID_IDENTIFIER_CALLEES = [
+  "isFinite",
+  "isNaN",
+  "parseFloat",
+  "parseInt",
+  "decodeURI",
+  "decodeURIComponent",
+  "encodeURI",
+  "encodeURIComponent",
+  process.env.BABEL_8_BREAKING ? "btoa" : null,
+  process.env.BABEL_8_BREAKING ? "atob" : null,
+] as const;
+
 const INVALID_METHODS = ["random"] as const;
 
-function isValidCallee(val: string): val is (typeof VALID_CALLEES)[number] {
-  return VALID_CALLEES.includes(
+function isValidObjectCallee(
+  val: string,
+): val is (typeof VALID_OBJECT_CALLEES)[number] {
+  return VALID_OBJECT_CALLEES.includes(
+    // @ts-expect-error val is a string
+    val,
+  );
+}
+
+function isValidIdentifierCallee(
+  val: string,
+): val is (typeof VALID_IDENTIFIER_CALLEES)[number] {
+  return VALID_IDENTIFIER_CALLEES.includes(
     // @ts-expect-error val is a string
     val,
   );
@@ -282,9 +306,8 @@ function _evaluate(path: NodePath, state: State): any {
         deopt(prop, state);
         return;
       }
-      const keyPath = (prop as NodePath<t.ObjectProperty>).get("key");
+      const keyPath = prop.get("key");
       let key;
-      // @ts-expect-error todo(flow->ts): type refinement issues ObjectMethod and SpreadElement somehow not excluded
       if (prop.node.computed) {
         key = keyPath.evaluate();
         if (!key.confident) {
@@ -299,7 +322,7 @@ function _evaluate(path: NodePath, state: State): any {
           keyPath.node as t.StringLiteral | t.NumericLiteral | t.BigIntLiteral
         ).value;
       }
-      const valuePath = (prop as NodePath<t.ObjectProperty>).get("value");
+      const valuePath = prop.get("value");
       let value = valuePath.evaluate();
       if (!value.confident) {
         deopt(value.deopt, state);
@@ -373,7 +396,7 @@ function _evaluate(path: NodePath, state: State): any {
       case "==":
         return left == right; // eslint-disable-line eqeqeq
       case "!=":
-        return left != right;
+        return left != right; // eslint-disable-line eqeqeq
       case "===":
         return left === right;
       case "!==":
@@ -402,7 +425,8 @@ function _evaluate(path: NodePath, state: State): any {
     if (
       callee.isIdentifier() &&
       !path.scope.getBinding(callee.node.name) &&
-      isValidCallee(callee.node.name)
+      (isValidObjectCallee(callee.node.name) ||
+        isValidIdentifierCallee(callee.node.name))
     ) {
       func = global[callee.node.name];
     }
@@ -415,12 +439,14 @@ function _evaluate(path: NodePath, state: State): any {
       if (
         object.isIdentifier() &&
         property.isIdentifier() &&
-        isValidCallee(object.node.name) &&
+        isValidObjectCallee(object.node.name) &&
         !isInvalidMethod(property.node.name)
       ) {
         context = global[object.node.name];
-        // @ts-expect-error property may not exist in context object
-        func = context[property.node.name];
+        const key = property.node.name;
+        if (Object.hasOwn(context, key)) {
+          func = context[key as keyof typeof context];
+        }
       }
 
       // "abc".charCodeAt(4)

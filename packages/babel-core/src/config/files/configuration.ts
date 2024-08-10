@@ -4,21 +4,21 @@ import path from "path";
 import json5 from "json5";
 import gensync from "gensync";
 import type { Handler } from "gensync";
-import { makeWeakCache, makeWeakCacheSync } from "../caching";
-import type { CacheConfigurator } from "../caching";
-import { makeConfigAPI } from "../helpers/config-api";
-import type { ConfigAPI } from "../helpers/config-api";
-import { makeStaticFileCache } from "./utils";
-import loadCodeDefault from "./module-types";
-import pathPatternToRegex from "../pattern-to-regex";
-import type { FilePackageData, RelativeConfig, ConfigFile } from "./types";
-import type { CallerMetadata, InputOptions } from "../validation/options";
-import ConfigError from "../../errors/config-error";
+import { makeWeakCache, makeWeakCacheSync } from "../caching.ts";
+import type { CacheConfigurator } from "../caching.ts";
+import { makeConfigAPI } from "../helpers/config-api.ts";
+import type { ConfigAPI } from "../helpers/config-api.ts";
+import { makeStaticFileCache } from "./utils.ts";
+import loadCodeDefault from "./module-types.ts";
+import pathPatternToRegex from "../pattern-to-regex.ts";
+import type { FilePackageData, RelativeConfig, ConfigFile } from "./types.ts";
+import type { CallerMetadata, InputOptions } from "../validation/options.ts";
+import ConfigError from "../../errors/config-error.ts";
 
-import * as fs from "../../gensync-utils/fs";
+import * as fs from "../../gensync-utils/fs.ts";
 
 import { createRequire } from "module";
-import { endHiddenCallStack } from "../../errors/rewrite-stack-trace";
+import { endHiddenCallStack } from "../../errors/rewrite-stack-trace.ts";
 const require = createRequire(import.meta.url);
 
 const debug = buildDebug("babel:config:loading:files:configuration");
@@ -41,8 +41,6 @@ const RELATIVE_CONFIG_FILENAMES = [
 
 const BABELIGNORE_FILENAME = ".babelignore";
 
-const LOADING_CONFIGS = new Set();
-
 type ConfigCacheData = {
   envName: string;
   caller: CallerMetadata | undefined;
@@ -59,7 +57,7 @@ const runConfig = makeWeakCache(function* runConfig(
   yield* [];
 
   return {
-    options: endHiddenCallStack(options as any as (api: ConfigAPI) => {})(
+    options: endHiddenCallStack(options as any as (api: ConfigAPI) => unknown)(
       makeConfigAPI(cache),
     ),
     cacheNeedsConfiguration: !cache.configured(),
@@ -72,25 +70,11 @@ function* readConfigCode(
 ): Handler<ConfigFile | null> {
   if (!nodeFs.existsSync(filepath)) return null;
 
-  // The `require()` call below can make this code reentrant if a require hook like @babel/register has been
-  // loaded into the system. That would cause Babel to attempt to compile the `.babelrc.js` file as it loads
-  // below. To cover this case, we auto-ignore re-entrant config processing.
-  if (LOADING_CONFIGS.has(filepath)) {
-    debug("Auto-ignoring usage of config %o.", filepath);
-    return buildConfigFileObject({}, filepath);
-  }
-
-  let options: unknown;
-  try {
-    LOADING_CONFIGS.add(filepath);
-    options = yield* loadCodeDefault(
-      filepath,
-      "You appear to be using a native ECMAScript module configuration " +
-        "file, which is only supported when running Babel asynchronously.",
-    );
-  } finally {
-    LOADING_CONFIGS.delete(filepath);
-  }
+  let options = yield* loadCodeDefault(
+    filepath,
+    "You appear to be using a native ECMAScript module configuration " +
+      "file, which is only supported when running Babel asynchronously.",
+  );
 
   let cacheNeedsConfiguration = false;
   if (typeof options === "function") {

@@ -1,4 +1,4 @@
-import type NodePath from "../index";
+import type NodePath from "../index.ts";
 import {
   BOOLEAN_NUMBER_BINARY_OPERATORS,
   createTypeAnnotationBasedOnTypeof,
@@ -6,9 +6,9 @@ import {
   voidTypeAnnotation,
 } from "@babel/types";
 import type * as t from "@babel/types";
-import type Binding from "../../scope/binding";
+import type Binding from "../../scope/binding.ts";
 
-import { createUnionType } from "./util";
+import { createUnionType } from "./util.ts";
 
 export default function (this: NodePath<t.Identifier>, node: t.Identifier) {
   if (!this.isReferenced()) return;
@@ -61,7 +61,7 @@ function getTypeAnnotationBindingConstantViolations(
 
     // remove constant violations observed before the IfStatement
     constantViolations = constantViolations.filter(
-      path => testConstantViolations.indexOf(path) < 0,
+      path => !testConstantViolations.includes(path),
     );
 
     // clear current types and add in observed test type
@@ -146,7 +146,7 @@ function inferAnnotationFromBinaryExpression(
     if (operator === "===") {
       return target.getTypeAnnotation();
     }
-    if (BOOLEAN_NUMBER_BINARY_OPERATORS.indexOf(operator) >= 0) {
+    if (BOOLEAN_NUMBER_BINARY_OPERATORS.includes(operator)) {
       return numberTypeAnnotation();
     }
 
@@ -155,7 +155,6 @@ function inferAnnotationFromBinaryExpression(
 
   if (operator !== "===" && operator !== "==") return;
 
-  //
   let typeofPath: NodePath<t.UnaryExpression>;
   let typePath: NodePath<t.Expression>;
   if (left.isUnaryExpression({ operator: "typeof" })) {

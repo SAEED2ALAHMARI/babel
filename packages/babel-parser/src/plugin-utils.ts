@@ -1,17 +1,17 @@
-import type Parser from "./parser";
+import type Parser from "./parser/index.ts";
 import type {
   ParserPluginWithOptions,
   PluginConfig,
   PluginOptions,
-} from "./typings";
+} from "./typings.ts";
 
 export type Plugin = PluginConfig;
 
 export type PluginList = PluginConfig[];
 
-export type MixinPlugin = (superClass: { new (...args: any): Parser }) => {
-  new (...args: any): Parser;
-};
+export type MixinPlugin = (
+  superClass: new (...args: any) => Parser,
+) => new (...args: any) => Parser;
 
 // This function’s second parameter accepts either a string (plugin name) or an
 // array pair (plugin name and options object). If an options object is given,
@@ -72,7 +72,6 @@ export function getPluginOption<
 
 const PIPELINE_PROPOSALS = ["minimal", "fsharp", "hack", "smart"];
 const TOPIC_TOKENS = ["^^", "@@", "^", "%", "#"];
-const RECORD_AND_TUPLE_SYNTAX_TYPES = ["hash", "bar"];
 
 export function validatePlugins(plugins: PluginList) {
   if (hasPlugin(plugins, "decorators")) {
@@ -127,10 +126,13 @@ export function validatePlugins(plugins: PluginList) {
       );
     }
 
-    const tupleSyntaxIsHash = hasPlugin(plugins, [
-      "recordAndTuple",
-      { syntaxType: "hash" },
-    ]);
+    const recordAndTupleConfigItem:
+      | "recordAndTuple"
+      | ["recordAndTuple", { syntaxType: "hash" }] = process.env
+      .BABEL_8_BREAKING
+      ? "recordAndTuple"
+      : ["recordAndTuple", { syntaxType: "hash" }];
+    const tupleSyntaxIsHash = hasPlugin(plugins, recordAndTupleConfigItem);
 
     if (proposal === "hack") {
       if (hasPlugin(plugins, "placeholders")) {
@@ -161,12 +163,12 @@ export function validatePlugins(plugins: PluginList) {
 
       if (topicToken === "#" && tupleSyntaxIsHash) {
         throw new Error(
-          'Plugin conflict between `["pipelineOperator", { proposal: "hack", topicToken: "#" }]` and `["recordAndtuple", { syntaxType: "hash"}]`.',
+          `Plugin conflict between \`["pipelineOperator", { proposal: "hack", topicToken: "#" }]\` and \`${JSON.stringify(recordAndTupleConfigItem)}\`.`,
         );
       }
     } else if (proposal === "smart" && tupleSyntaxIsHash) {
       throw new Error(
-        'Plugin conflict between `["pipelineOperator", { proposal: "smart" }]` and `["recordAndtuple", { syntaxType: "hash"}]`.',
+        `Plugin conflict between \`["pipelineOperator", { proposal: "smart" }]\` and \`${JSON.stringify(recordAndTupleConfigItem)}\`.`,
       );
     }
   }
@@ -208,17 +210,29 @@ export function validatePlugins(plugins: PluginList) {
     );
   }
 
-  if (
-    hasPlugin(plugins, "recordAndTuple") &&
-    getPluginOption(plugins, "recordAndTuple", "syntaxType") != null &&
-    !RECORD_AND_TUPLE_SYNTAX_TYPES.includes(
-      getPluginOption(plugins, "recordAndTuple", "syntaxType"),
-    )
-  ) {
-    throw new Error(
-      "The 'syntaxType' option of the 'recordAndTuple' plugin must be one of: " +
-        RECORD_AND_TUPLE_SYNTAX_TYPES.map(p => `'${p}'`).join(", "),
-    );
+  if (hasPlugin(plugins, "recordAndTuple")) {
+    const syntaxType = getPluginOption(plugins, "recordAndTuple", "syntaxType");
+    if (syntaxType != null) {
+      if (process.env.BABEL_8_BREAKING) {
+        if (syntaxType === "hash") {
+          throw new Error(
+            'The syntaxType option is no longer required in Babel 8. You can safely remove { syntaxType: "hash" } from the recordAndTuple config.',
+          );
+        } else {
+          throw new Error(
+            'The syntaxType option is no longer required in Babel 8. Please remove { syntaxType: "bar" } from the recordAndTuple config and migrate to the hash syntax #{} and #[].',
+          );
+        }
+      } else {
+        const RECORD_AND_TUPLE_SYNTAX_TYPES = ["hash", "bar"];
+        if (!RECORD_AND_TUPLE_SYNTAX_TYPES.includes(syntaxType)) {
+          throw new Error(
+            "The 'syntaxType' option of the 'recordAndTuple' plugin must be one of: " +
+              RECORD_AND_TUPLE_SYNTAX_TYPES.map(p => `'${p}'`).join(", "),
+          );
+        }
+      }
+    }
   }
 
   if (
@@ -232,16 +246,27 @@ export function validatePlugins(plugins: PluginList) {
     error.missingPlugins = "doExpressions";
     throw error;
   }
+
+  if (
+    hasPlugin(plugins, "optionalChainingAssign") &&
+    getPluginOption(plugins, "optionalChainingAssign", "version") !== "2023-07"
+  ) {
+    throw new Error(
+      "The 'optionalChainingAssign' plugin requires a 'version' option," +
+        " representing the last proposal update. Currently, the" +
+        " only supported value is '2023-07'.",
+    );
+  }
 }
 
 // These plugins are defined using a mixin which extends the parser class.
 
-import estree from "./plugins/estree";
-import flow from "./plugins/flow";
-import jsx from "./plugins/jsx";
-import typescript from "./plugins/typescript";
-import placeholders from "./plugins/placeholders";
-import v8intrinsic from "./plugins/v8intrinsic";
+import estree from "./plugins/estree.ts";
+import flow from "./plugins/flow/index.ts";
+import jsx from "./plugins/jsx/index.ts";
+import typescript from "./plugins/typescript/index.ts";
+import placeholders from "./plugins/placeholders.ts";
+import v8intrinsic from "./plugins/v8intrinsic.ts";
 
 // NOTE: order is important. estree must come first; placeholders must come last.
 export const mixinPlugins = {

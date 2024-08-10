@@ -42,7 +42,7 @@ jobs:
     if: needs.check-release-type.outputs.is-babel-8 == 'false'
     steps:
       - name: Checkout the new tag
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: This release will publish the following packages
@@ -63,7 +63,7 @@ jobs:
     outputs:
       branch: ${{ steps.branch-name.outputs.branch }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -107,7 +107,7 @@ jobs:
       (needs.git-version.result == 'success' || needs.git-version.result == 'skipped') &&
       needs.check-release-type.result == 'success'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Checkout the temporary branch
@@ -141,6 +141,23 @@ jobs:
         env:
           YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Generate babel-types docs
+        continue-on-error: true
+        if: needs.check-release-type.outputs.is-babel-8 == 'false'
+        run: |
+          mkdir build
+          node ./scripts/set-module-type.js commonjs
+          node ./packages/babel-types/scripts/generators/docs.js > ./build/types.md
+
+      - name: Upload babel-types docs
+        continue-on-error: true
+        if: needs.check-release-type.outputs.is-babel-8 == 'false'
+        uses: actions/upload-artifact@v3
+        with:
+          name: babel-types-docs
+          path: build/types.md
+          retention-days: 3
+
       - name: Publish to npm (Babel 8)
         # --tag-version-prefix must match the one set in `make new-babel-8-version-create-branch`
         run: yarn release-tool publish --yes --tag next --tag-version-prefix tmp.v
@@ -166,7 +183,7 @@ jobs:
       changelog: ${{ steps.changelog.outputs.changelog }}
       version: ${{ steps.tags.outputs.new }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -232,7 +249,7 @@ jobs:
       needs.github-release.result == 'success' &&
       needs.github-release.outputs.is-main
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Checkout the temporary branch
@@ -263,3 +280,48 @@ jobs:
       - name: Delete temporary branch from GitHub
         if: needs.git-version.result == 'success'
         run: git push "https://babel-bot:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" :${{ needs.git-version.outputs.branch }}
+
+  types-docs-updates:
+    name: Update Babel types docs
+    runs-on: ubuntu-latest
+    needs:
+      - check-release-type
+      - github-release
+      - github-push
+    if: |
+      always() &&
+      needs.check-release-type.outputs.is-babel-8 == 'false' &&
+      needs.github-push.result == 'success' &&
+      needs.github-release.result == 'success' &&
+      needs.github-release.outputs.is-main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: babel/website
+          fetch-depth: 0 # Otherwise we cannot push
+          persist-credentials: false # So that we can push with BOT_TOKEN, otherwise it doesn't trigger CI
+      - name: Download babel-types docs
+        uses: actions/download-artifact@v3
+        with:
+          name: babel-types-docs
+          # Downloaded as ./docs/types.md
+          path: docs
+      - name: Commit Babel website changes
+        run: |
+          git config user.name "Babel Bot"
+          git config user.email "babel-bot@users.noreply.github.com"
+          git checkout -b update-types-docs
+          git commit -am "docs: update babel types"
+          git push --force "https://babel-bot:${{ secrets.BOT_TOKEN }}@github.com/babel/website.git" update-types-docs
+      - name: Create Pull Request
+        uses: babel/actions/create-pull-request@v2
+        with:
+          token: ${{ secrets.BOT_TOKEN }}
+          repository: babel/website
+          branch: update-types-docs
+          base: main
+          title: Update Babel types docs
+          description: Updated `@babel/types` docs for [Babel ${{ needs.github-release.outputs.version }}](https://github.com/babel/babel/releases/tag/${{ needs.github-release.outputs.version }}).
+          labels: |
+            docs
+            repo automation :robot:

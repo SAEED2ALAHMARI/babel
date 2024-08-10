@@ -1,5 +1,6 @@
-import { template, types as t } from "@babel/core";
-import type { NodePath } from "@babel/traverse";
+import { template, types as t, type NodePath } from "@babel/core";
+
+import { registerGlobalType } from "./global-types.ts";
 
 export default function transpileNamespace(
   path: NodePath<t.TSModuleDeclaration>,
@@ -24,6 +25,11 @@ export default function transpileNamespace(
   const name = path.node.id.name;
   const value = handleNested(path, t.cloneNode(path.node, true));
   if (value === null) {
+    // This means that `path` is a type-only namespace.
+    // We call `registerGlobalType` here to allow it to be stripped.
+    const program = path.findParent(p => p.isProgram());
+    registerGlobalType(program.scope, name);
+
     path.remove();
   } else if (path.scope.hasOwnBinding(name)) {
     path.replaceWith(value);
@@ -242,6 +248,9 @@ function handleNested(
               transformed,
             );
           }
+        } else {
+          namespaceTopLevel.splice(i, 1);
+          i--;
         }
       }
     }

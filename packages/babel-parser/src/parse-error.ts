@@ -1,13 +1,15 @@
-import { Position } from "./util/location";
-import {
-  instantiate,
-  ParseErrorCode,
-  type ParseErrorCredentials,
-  type ToMessage,
-  type SyntaxPlugin,
-} from "./parse-error/credentials";
-import type { Undone } from "./parser/node";
-import type { Node } from "./types";
+import { Position } from "./util/location.ts";
+
+type SyntaxPlugin =
+  | "flow"
+  | "typescript"
+  | "jsx"
+  | "pipelineOperator"
+  | "placeholders";
+
+type ParseErrorCode =
+  | "BABEL_PARSER_SYNTAX_ERROR"
+  | "BABEL_PARSER_SOURCETYPE_MODULE_REQUIRED";
 
 // Babel uses "normal" SyntaxErrors for it's errors, but adds some extra
 // functionality. This functionality is defined in the
@@ -42,68 +44,75 @@ export type ParseError<ErrorDetails> = SyntaxError &
 // separate classes from `SyntaxError`'s.
 //
 // 1. https://github.com/microsoft/TypeScript/blob/v4.5.5/lib/lib.es5.d.ts#L1027
-export type ParseErrorConstructor<ErrorDetails> = (a: {
-  loc: Position;
-  details: ErrorDetails;
-}) => ParseError<ErrorDetails>;
+export type ParseErrorConstructor<ErrorDetails> = (
+  loc: Position,
+  details: ErrorDetails,
+) => ParseError<ErrorDetails>;
+
+type ToMessage<ErrorDetails> = (self: ErrorDetails) => string;
+
+type ParseErrorCredentials<ErrorDetails> = {
+  code: string;
+  reasonCode: string;
+  syntaxPlugin?: SyntaxPlugin;
+  toMessage: ToMessage<ErrorDetails>;
+};
+
+function defineHidden(obj: object, key: string, value: unknown) {
+  Object.defineProperty(obj, key, {
+    enumerable: false,
+    configurable: true,
+    value,
+  });
+}
 
 function toParseErrorConstructor<ErrorDetails extends object>({
   toMessage,
   ...properties
 }: ParseErrorCredentials<ErrorDetails>): ParseErrorConstructor<ErrorDetails> {
-  type ConstructorArgument = {
-    loc: Position;
-    details: ErrorDetails;
-  };
+  return function constructor(loc: Position, details: ErrorDetails) {
+    const error = new SyntaxError();
+    Object.assign(error, properties, { loc, pos: loc.index });
+    if ("missingPlugin" in details) {
+      Object.assign(error, { missingPlugin: details.missingPlugin });
+    }
 
-  return function constructor({ loc, details }: ConstructorArgument) {
-    return instantiate(
-      SyntaxError,
-      { ...properties, loc },
-      {
-        clone(
-          overrides: {
-            loc?: Position;
-            details?: ErrorDetails;
-          } = {},
-        ) {
-          const loc = (overrides.loc || {}) as Partial<Position>;
-          return constructor({
-            loc: new Position(
-              "line" in loc ? loc.line : this.loc.line,
-              "column" in loc ? loc.column : this.loc.column,
-              "index" in loc ? loc.index : this.loc.index,
-            ),
-            details: { ...this.details, ...overrides.details },
-          });
-        },
-        details: { value: details, enumerable: false },
-        message: {
-          get(this: ConstructorArgument): string {
-            return `${toMessage(this.details)} (${this.loc.line}:${
-              this.loc.column
-            })`;
-          },
-          set(value: string) {
-            Object.defineProperty(this, "message", { value });
-          },
-        },
-        pos: { reflect: "loc.index", enumerable: true },
-        missingPlugin: "missingPlugin" in details && {
-          reflect: "details.missingPlugin",
-          enumerable: true,
-        },
+    type Overrides = {
+      loc?: Position;
+      details?: ErrorDetails;
+    };
+    defineHidden(error, "clone", function clone(overrides: Overrides = {}) {
+      const { line, column, index } = overrides.loc ?? loc;
+      return constructor(new Position(line, column, index), {
+        ...details,
+        ...overrides.details,
+      });
+    });
+
+    defineHidden(error, "details", details);
+
+    Object.defineProperty(error, "message", {
+      configurable: true,
+      get(this: ParseError<ErrorDetails>): string {
+        const message = `${toMessage(details)} (${loc.line}:${loc.column})`;
+        this.message = message;
+        return message;
       },
-    ) as ParseError<ErrorDetails>;
+      set(value: string) {
+        Object.defineProperty(this, "message", { value, writable: true });
+      },
+    });
+
+    return error as ParseError<ErrorDetails>;
   };
 }
 
 type ParseErrorTemplate =
   | string
   | ToMessage<any>
-  | { message: string | ToMessage<any> };
+  | { message: string | ToMessage<any>; code?: ParseErrorCode };
 
-type ParseErrorTemplates = { [reasonCode: string]: ParseErrorTemplate };
+export type ParseErrorTemplates = { [reasonCode: string]: ParseErrorTemplate };
 
 // This is the templated form of `ParseErrorEnum`.
 //
@@ -121,10 +130,10 @@ export function ParseErrorEnum(a: TemplateStringsArray): <
     T[K] extends { message: string | ToMessage<any> }
       ? T[K]["message"] extends ToMessage<any>
         ? Parameters<T[K]["message"]>[0]
-        : {}
+        : object
       : T[K] extends ToMessage<any>
-      ? Parameters<T[K]>[0]
-      : {}
+        ? Parameters<T[K]>[0]
+        : object
   >;
 };
 
@@ -136,10 +145,10 @@ export function ParseErrorEnum<T extends ParseErrorTemplates>(
     T[K] extends { message: string | ToMessage<any> }
       ? T[K]["message"] extends ToMessage<any>
         ? Parameters<T[K]["message"]>[0]
-        : {}
+        : object
       : T[K] extends ToMessage<any>
-      ? Parameters<T[K]>[0]
-      : {}
+        ? Parameters<T[K]>[0]
+        : object
   >;
 };
 
@@ -156,7 +165,7 @@ export function ParseErrorEnum<T extends ParseErrorTemplates>(
 //   ErrorWithDynamicMessage: ({ type } : { type: string }) => `${type}`),
 //   ErrorWithOverriddenCodeAndOrReasonCode: {
 //     message: ({ type }: { type: string }) => `${type}`),
-//     code: ParseErrorCode.SourceTypeModuleError,
+//     code: "AN_ERROR_CODE",
 //     ...(BABEL_8_BREAKING ? { } : { reasonCode: "CustomErrorReasonCode" })
 //   }
 // });
@@ -184,12 +193,12 @@ export function ParseErrorEnum(
       typeof template === "string"
         ? { message: () => template }
         : typeof template === "function"
-        ? { message: template }
-        : template;
+          ? { message: template }
+          : template;
     const toMessage = typeof message === "string" ? () => message : message;
 
     ParseErrorConstructors[reasonCode] = toParseErrorConstructor({
-      code: ParseErrorCode.SyntaxError,
+      code: "BABEL_PARSER_SYNTAX_ERROR",
       reasonCode,
       toMessage,
       ...(syntaxPlugin ? { syntaxPlugin } : {}),
@@ -200,14 +209,10 @@ export function ParseErrorEnum(
   return ParseErrorConstructors;
 }
 
-export type RaiseProperties<ErrorDetails> = {
-  at: Position | Undone<Node>;
-} & ErrorDetails;
-
-import ModuleErrors from "./parse-error/module-errors";
-import StandardErrors from "./parse-error/standard-errors";
-import StrictModeErrors from "./parse-error/strict-mode-errors";
-import PipelineOperatorErrors from "./parse-error/pipeline-operator-errors";
+import ModuleErrors from "./parse-error/module-errors.ts";
+import StandardErrors from "./parse-error/standard-errors.ts";
+import StrictModeErrors from "./parse-error/strict-mode-errors.ts";
+import PipelineOperatorErrors from "./parse-error/pipeline-operator-errors.ts";
 
 export const Errors = {
   ...ParseErrorEnum(ModuleErrors),
@@ -216,6 +221,4 @@ export const Errors = {
   ...ParseErrorEnum`pipelineOperator`(PipelineOperatorErrors),
 };
 
-export type { LValAncestor } from "./parse-error/standard-errors";
-
-export * from "./parse-error/credentials";
+export type { LValAncestor } from "./parse-error/standard-errors.ts";

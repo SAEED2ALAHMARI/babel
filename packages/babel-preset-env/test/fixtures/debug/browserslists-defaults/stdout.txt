@@ -2,35 +2,26 @@
 
 Using targets:
 {
-  "android": "113",
+  "android": "125",
   "chrome": "109",
-  "edge": "112",
-  "firefox": "102",
+  "edge": "124",
+  "firefox": "115",
   "ios": "15.6",
-  "opera": "98",
-  "opera_mobile": "73",
-  "safari": "15.6",
-  "samsung": "20"
+  "opera": "109",
+  "opera_mobile": "80",
+  "safari": "17.4",
+  "samsung": "24"
 }
 
 Using modules transform: auto
 
 Using plugins:
-  transform-unicode-sets-regex { chrome < 112, firefox < 116, ios, opera_mobile < 75, safari, samsung }
-  transform-class-static-block { ios < 16.4, safari < 16.4 }
-  syntax-private-property-in-object
-  syntax-class-properties
-  syntax-numeric-separator
-  syntax-nullish-coalescing-operator
-  syntax-optional-chaining
-  syntax-json-strings
-  syntax-optional-catch-binding
-  syntax-async-generators
-  syntax-object-rest-spread
-  bugfix/transform-safari-id-destructuring-collision-in-function-expression { ios < 16.3, safari < 16.3 }
+  transform-unicode-sets-regex { chrome < 112, firefox < 116, ios < 17, samsung }
+  bugfix/transform-firefox-class-in-computed-class-key { firefox }
+  transform-class-static-block { ios < 16.4 }
+  transform-export-namespace-from { }
+  bugfix/transform-safari-id-destructuring-collision-in-function-expression { ios < 16.3 }
   transform-modules-commonjs
   transform-dynamic-import
-  transform-export-namespace-from { }
-  syntax-import-meta
 
 Using polyfills: No polyfills were added, since the `useBuiltIns` option was not set.

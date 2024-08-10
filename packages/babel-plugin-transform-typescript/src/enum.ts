@@ -1,5 +1,4 @@
-import { template, types as t } from "@babel/core";
-import type { NodePath } from "@babel/traverse";
+import { template, types as t, type NodePath } from "@babel/core";
 import assert from "assert";
 import annotateAsPure from "@babel/helper-annotate-as-pure";
 
@@ -155,7 +154,9 @@ const enumSelfReferenceVisitor = {
 };
 
 export function translateEnumValues(path: NodePath<t.TSEnumDeclaration>, t: t) {
-  const seen: PreviousEnumMembers = new Map();
+  const bindingIdentifier = path.scope.getBindingIdentifier(path.node.id.name);
+  const seen: PreviousEnumMembers = ENUMS.get(bindingIdentifier) ?? new Map();
+
   // Start at -1 so the first enum member is its increment, 0.
   let constValue: number | string | undefined = -1;
   let lastName: string;
@@ -320,15 +321,11 @@ function computeConstantValue(
       }
 
       if (seen.has(path.node)) return;
+      seen.add(path.node);
 
-      const bindingInitPath = path.resolve(); // It only resolves constant bindings
-      if (bindingInitPath) {
-        seen.add(path.node);
-
-        value = computeConstantValue(bindingInitPath, undefined, seen);
-        prevMembers?.set(name, value);
-        return value;
-      }
+      value = computeConstantValue(path.resolve(), prevMembers, seen);
+      prevMembers?.set(name, value);
+      return value;
     }
   }
 
@@ -344,6 +341,7 @@ function computeConstantValue(
       case "+":
         return value;
       case "-":
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-unary-minus
         return -value;
       case "~":
         return ~value;

@@ -8,7 +8,7 @@ Using targets:
 Using modules transform: auto
 
 Using plugins:
-  transform-unicode-sets-regex { safari }
+  transform-unicode-sets-regex { safari < 17 }
   transform-class-static-block { safari < 16.4 }
   syntax-private-property-in-object
   syntax-class-properties
@@ -19,10 +19,10 @@ Using plugins:
   syntax-optional-catch-binding
   syntax-async-generators
   syntax-object-rest-spread
+  transform-export-namespace-from { }
   bugfix/transform-safari-id-destructuring-collision-in-function-expression { safari < 16.3 }
   transform-modules-commonjs
   transform-dynamic-import
-  transform-export-namespace-from { }
   syntax-top-level-await
   syntax-import-meta
 

@@ -6,8 +6,8 @@ import {
   onFirstPause,
   waitFor,
   isThenable,
-} from "../gensync-utils/async";
-import { isIterableIterator } from "./util";
+} from "../gensync-utils/async.ts";
+import { isIterableIterator } from "./util.ts";
 
 export type { CacheConfigurator };
 
@@ -357,9 +357,9 @@ function makeSimpleConfigurator(
   }
   cacheFn.forever = () => cache.forever();
   cacheFn.never = () => cache.never();
-  cacheFn.using = (cb: { (): SimpleType }) =>
+  cacheFn.using = (cb: () => SimpleType) =>
     cache.using(() => assertSimpleType(cb()));
-  cacheFn.invalidate = (cb: { (): SimpleType }) =>
+  cacheFn.invalidate = (cb: () => SimpleType) =>
     cache.invalidate(() => assertSimpleType(cb()));
 
   return cacheFn as any;

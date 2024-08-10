@@ -9,10 +9,10 @@ import {
   isUnreleasedVersion,
   getLowestUnreleased,
   getHighestUnreleased,
-} from "./utils";
+} from "./utils.ts";
 import { OptionValidator } from "@babel/helper-validator-option";
-import { browserNameMap } from "./targets";
-import { TargetNames } from "./options";
+import { browserNameMap } from "./targets.ts";
+import { TargetNames } from "./options.ts";
 import type {
   Target,
   Targets,
@@ -20,14 +20,14 @@ import type {
   Browsers,
   BrowserslistBrowserName,
   TargetsTuple,
-} from "./types";
+} from "./types.ts";
 
 export type { Target, Targets, InputTargets };
 
-export { prettifyTargets } from "./pretty";
-export { getInclusionReasons } from "./debug";
-export { default as filterItems, isRequired } from "./filter-items";
-export { unreleasedLabels } from "./targets";
+export { prettifyTargets } from "./pretty.ts";
+export { getInclusionReasons } from "./debug.ts";
+export { default as filterItems, isRequired } from "./filter-items.ts";
+export { unreleasedLabels } from "./targets.ts";
 export { TargetNames };
 
 const ESM_SUPPORT = browserModulesData["es6.module"];
@@ -101,7 +101,7 @@ function getLowestVersions(browsers: Array<string>): Targets {
 
           all[target] = semverMin(version, parsedBrowserVersion);
         }
-      } catch (e) {}
+      } catch (_) {}
 
       return all;
     },
@@ -129,7 +129,7 @@ getting parsed as 6.1, which can lead to unexpected behavior.
 function semverifyTarget(target: Target, value: string) {
   try {
     return semverify(value);
-  } catch (error) {
+  } catch (_) {
     throw new Error(
       v.formatMessage(
         `'${value}' is not a valid value for 'targets.${target}'.`,

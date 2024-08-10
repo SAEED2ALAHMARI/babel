@@ -7,7 +7,7 @@ type ReactCreateClassCall = t.CallExpression & {
 };
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   function addDisplayName(id: string, call: ReactCreateClassCall) {
     const props = call.arguments[0].properties;

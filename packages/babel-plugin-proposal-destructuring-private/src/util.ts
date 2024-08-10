@@ -1,7 +1,5 @@
-import type * as t from "@babel/types";
-import type { Scope } from "@babel/traverse";
-import { types } from "@babel/core";
-import type { File } from "@babel/core";
+import { types as t } from "@babel/core";
+import type { File, Scope } from "@babel/core";
 import { buildObjectExcludingKeys } from "@babel/plugin-transform-destructuring";
 const {
   assignmentExpression,
@@ -17,7 +15,7 @@ const {
   variableDeclarator,
   variableDeclaration,
   unaryExpression,
-} = types;
+} = t;
 
 function buildUndefinedNode() {
   return unaryExpression("void", numericLiteral(0));
@@ -151,7 +149,7 @@ function buildAssignmentsFromPatternList(
 }
 
 type StackItem = {
-  node: t.LVal | t.ObjectProperty | null;
+  node: t.AssignmentExpression["left"] | t.ObjectProperty | null;
   index: number;
   depth: number;
 };
@@ -169,9 +167,9 @@ type StackItem = {
  * @param visitor
  */
 export function* traversePattern(
-  root: t.LVal,
+  root: t.AssignmentExpression["left"],
   visitor: (
-    node: t.LVal | t.ObjectProperty,
+    node: t.AssignmentExpression["left"] | t.ObjectProperty,
     index: number,
     depth: number,
   ) => Generator<any, void, any>,
@@ -221,7 +219,7 @@ export function* traversePattern(
   }
 }
 
-export function hasPrivateKeys(pattern: t.LVal) {
+export function hasPrivateKeys(pattern: t.AssignmentExpression["left"]) {
   let result = false;
   traversePattern(pattern, function* (node) {
     if (isObjectProperty(node) && isPrivateName(node.key)) {

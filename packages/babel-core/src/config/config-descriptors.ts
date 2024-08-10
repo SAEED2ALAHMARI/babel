@@ -1,25 +1,25 @@
 import gensync, { type Handler } from "gensync";
-import { once } from "../gensync-utils/functional";
+import { once } from "../gensync-utils/functional.ts";
 
-import { loadPlugin, loadPreset } from "./files";
+import { loadPlugin, loadPreset } from "./files/index.ts";
 
-import { getItemDescriptor } from "./item";
+import { getItemDescriptor } from "./item.ts";
 
 import {
   makeWeakCacheSync,
   makeStrongCacheSync,
   makeStrongCache,
-} from "./caching";
-import type { CacheConfigurator } from "./caching";
+} from "./caching.ts";
+import type { CacheConfigurator } from "./caching.ts";
 
 import type {
   ValidatedOptions,
   PluginList,
   PluginItem,
-} from "./validation/options";
+} from "./validation/options.ts";
 
-import { resolveBrowserslistConfigFile } from "./resolve-targets";
-import type { PluginAPI, PresetAPI } from "./helpers/config-api";
+import { resolveBrowserslistConfigFile } from "./resolve-targets.ts";
+import type { PluginAPI, PresetAPI } from "./helpers/config-api.ts";
 
 // Represents a config object and functions to lazily load the descriptors
 // for the plugins and presets so we don't load the plugins/presets unless
@@ -33,7 +33,7 @@ export type OptionsAndDescriptors = {
 // Represents a plugin or presets at a given location in a config object.
 // At this point these have been resolved to a specific object or function,
 // but have not yet been executed to call functions with options.
-export interface UnloadedDescriptor<API, Options = {} | undefined | false> {
+export interface UnloadedDescriptor<API, Options = object | undefined | false> {
   name: string | undefined;
   value: object | ((api: API, options: Options, dirname: string) => unknown);
   options: Options;
@@ -199,7 +199,10 @@ const DEFAULT_OPTIONS = {};
  * next time.
  */
 function loadCachedDescriptor<API>(
-  cache: WeakMap<{} | Function, WeakMap<{}, Array<UnloadedDescriptor<API>>>>,
+  cache: WeakMap<
+    object | Function,
+    WeakMap<object, Array<UnloadedDescriptor<API>>>
+  >,
   desc: UnloadedDescriptor<API>,
 ) {
   const { value, options = DEFAULT_OPTIONS } = desc;
@@ -217,7 +220,7 @@ function loadCachedDescriptor<API>(
     cacheByOptions.set(options, possibilities);
   }
 
-  if (possibilities.indexOf(desc) === -1) {
+  if (!possibilities.includes(desc)) {
     const matches = possibilities.filter(possibility =>
       isEqualDescriptor(possibility, desc),
     );

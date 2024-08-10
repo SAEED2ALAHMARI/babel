@@ -3,7 +3,7 @@ import { declare } from "@babel/helper-plugin-utils";
 import nameFunction from "@babel/helper-function-name";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
   const supportUnicodeId = !isRequired(
     "transform-unicode-escapes",
     api.targets(),
@@ -28,7 +28,7 @@ export default declare(api => {
           const newNode = nameFunction(
             // @ts-expect-error Fixme: should check ArrowFunctionExpression
             value,
-            false,
+            undefined,
             supportUnicodeId,
           );
           if (newNode) value.replaceWith(newNode);

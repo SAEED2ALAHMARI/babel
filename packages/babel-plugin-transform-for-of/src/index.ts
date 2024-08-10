@@ -1,8 +1,8 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { template, types as t } from "@babel/core";
-import type { NodePath } from "@babel/traverse";
+import { template, types as t, type NodePath } from "@babel/core";
 
-import transformWithoutHelper from "./no-helper-implementation";
+import transformWithoutHelper from "./no-helper-implementation.ts";
+import { skipTransparentExprWrapperNodes } from "@babel/helper-skip-transparent-expression-wrappers";
 
 export interface Options {
   allowArrayLike?: boolean;
@@ -33,7 +33,7 @@ function buildLoopBody(
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   {
     const { assumeArray, allowArrayLike, loose } = options;
@@ -85,13 +85,24 @@ export default declare((api, options: Options) => {
       visitor: {
         ForOfStatement(path) {
           const { scope } = path;
-          const { left, right, await: isAwait } = path.node;
+          const { left, await: isAwait } = path.node;
           if (isAwait) {
             return;
           }
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          const right = skipTransparentExprWrapperNodes(
+            path.node.right,
+          ) as t.Expression;
           const i = scope.generateUidIdentifier("i");
           let array: t.Identifier | t.ThisExpression =
             scope.maybeGenerateMemoised(right, true);
+          if (
+            !array &&
+            t.isIdentifier(right) &&
+            path.get("body").scope.hasOwnBinding(right.name)
+          ) {
+            array = scope.generateUidIdentifier("arr");
+          }
 
           const inits = [t.variableDeclarator(i, t.numericLiteral(0))];
           if (array) {

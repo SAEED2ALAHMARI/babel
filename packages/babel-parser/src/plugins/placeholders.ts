@@ -1,13 +1,13 @@
 import * as charCodes from "charcodes";
 
-import { tokenLabelName, tt } from "../tokenizer/types";
-import type Parser from "../parser";
-import type * as N from "../types";
-import { ParseErrorEnum } from "../parse-error";
-import type { Undone } from "../parser/node";
-import type { ExpressionErrors } from "../parser/util";
-import type { BindingTypes } from "../util/scopeflags";
-import type { Position } from "../util/location";
+import { tokenLabelName, tt } from "../tokenizer/types.ts";
+import type Parser from "../parser/index.ts";
+import type * as N from "../types.ts";
+import { ParseErrorEnum } from "../parse-error.ts";
+import type { Undone } from "../parser/node.ts";
+import type { ExpressionErrors } from "../parser/util.ts";
+import type { BindingFlag } from "../util/scopeflags.ts";
+import type { Position } from "../util/location.ts";
 
 type PossiblePlaceholders = {
   Identifier: N.Identifier;
@@ -35,15 +35,13 @@ const PlaceholderErrors = ParseErrorEnum`placeholders`({
   UnexpectedSpace: "Unexpected space in placeholder.",
 });
 
-/* eslint-disable sort-keys */
-
 export default (superClass: typeof Parser) =>
   class PlaceholdersParserMixin extends superClass implements Parser {
     parsePlaceholder<T extends PlaceholderTypes>(
       expectedNode: T,
-    ): /*?N.Placeholder<T>*/ MaybePlaceholder<T> | undefined | null {
+    ): /*?N.Placeholder<T>*/ MaybePlaceholder<T> | undefined {
       if (this.match(tt.placeholder)) {
-        const node = this.startNode();
+        const node = this.startNode<N.Placeholder<T>>();
         this.next();
         this.assertNoSpace();
 
@@ -53,20 +51,25 @@ export default (superClass: typeof Parser) =>
 
         this.assertNoSpace();
         this.expect(tt.placeholder);
-        // @ts-expect-error placeholder typings
         return this.finishPlaceholder(node, expectedNode);
       }
     }
 
     finishPlaceholder<T extends PlaceholderTypes>(
-      node: N.Node,
+      node: Undone<N.Placeholder> | Undone<NodeOf<PlaceholderTypes>>,
       expectedNode: T,
     ): /*N.Placeholder<T>*/ MaybePlaceholder<T> {
-      const isFinished = !!(node.expectedNode && node.type === "Placeholder");
-      node.expectedNode = expectedNode;
+      let placeholder = node as unknown as N.Placeholder<T>;
 
-      // @ts-expect-error todo(flow->ts)
-      return isFinished ? node : this.finishNode(node, "Placeholder");
+      if (!placeholder.expectedNode || !placeholder.type) {
+        placeholder = this.finishNode(
+          placeholder,
+          "Placeholder",
+        ) as unknown as N.Placeholder<T>;
+      }
+
+      placeholder.expectedNode = expectedNode;
+      return placeholder as unknown as MaybePlaceholder<T>;
     }
 
     /* ============================================================ *
@@ -129,7 +132,7 @@ export default (superClass: typeof Parser) =>
       return this.parsePlaceholder("Pattern") || super.parseBindingAtom();
     }
 
-    isValidLVal(type: string, isParenthesized: boolean, binding: BindingTypes) {
+    isValidLVal(type: string, isParenthesized: boolean, binding: BindingFlag) {
       return (
         type === "Placeholder" ||
         super.isValidLVal(type, isParenthesized, binding)
@@ -179,8 +182,9 @@ export default (superClass: typeof Parser) =>
     // @ts-expect-error Plugin will override parser interface
     parseExpressionStatement(
       node: MaybePlaceholder<"Statement">,
-      expr: N.Expression,
+      expr: MaybePlaceholder<"Expression">,
     ): MaybePlaceholder<"Statement"> {
+      // @ts-expect-error placeholder typings
       if (expr.type !== "Placeholder" || expr.extra?.parenthesized) {
         // @ts-expect-error placeholder typings
         return super.parseExpressionStatement(node, expr);
@@ -196,8 +200,9 @@ export default (superClass: typeof Parser) =>
       }
 
       this.semicolon();
-      node.name = expr.name;
-      return this.finishPlaceholder(node, "Statement");
+      const stmtPlaceholder = node as unknown as N.Placeholder<"Statement">;
+      stmtPlaceholder.name = (expr as N.Placeholder).name;
+      return this.finishPlaceholder(stmtPlaceholder, "Statement");
     }
 
     parseBlock(
@@ -246,9 +251,10 @@ export default (superClass: typeof Parser) =>
           node.body = this.finishPlaceholder(placeholder, "ClassBody");
           return this.finishNode(node, type);
         } else {
-          throw this.raise(PlaceholderErrors.ClassNameIsRequired, {
-            at: this.state.startLoc,
-          });
+          throw this.raise(
+            PlaceholderErrors.ClassNameIsRequired,
+            this.state.startLoc,
+          );
         }
       } else {
         this.parseClassId(node, isStatement, optionalId);
@@ -261,25 +267,34 @@ export default (superClass: typeof Parser) =>
       return this.finishNode(node, type);
     }
 
-    parseExport(node: N.Node, decorators: N.Decorator[] | null): N.AnyExport {
+    parseExport(
+      node: Undone<
+        | N.ExportDefaultDeclaration
+        | N.ExportAllDeclaration
+        | N.ExportNamedDeclaration
+      >,
+      decorators: N.Decorator[] | null,
+    ): N.AnyExport {
       const placeholder = this.parsePlaceholder("Identifier");
       if (!placeholder) return super.parseExport(node, decorators);
 
+      const node2 = node as Undone<N.ExportNamedDeclaration>;
+
       if (!this.isContextual(tt._from) && !this.match(tt.comma)) {
         // export %%DECL%%;
-        node.specifiers = [];
-        node.source = null;
-        node.declaration = this.finishPlaceholder(placeholder, "Declaration");
-        return this.finishNode(node, "ExportNamedDeclaration");
+        node2.specifiers = [];
+        node2.source = null;
+        node2.declaration = this.finishPlaceholder(placeholder, "Declaration");
+        return this.finishNode(node2, "ExportNamedDeclaration");
       }
 
       // export %%NAME%% from "foo";
       this.expectPlugin("exportDefaultFrom");
-      const specifier = this.startNode();
+      const specifier = this.startNode<N.ExportDefaultSpecifier>();
       specifier.exported = placeholder;
-      node.specifiers = [this.finishNode(specifier, "ExportDefaultSpecifier")];
+      node2.specifiers = [this.finishNode(specifier, "ExportDefaultSpecifier")];
 
-      return super.parseExport(node, decorators);
+      return super.parseExport(node2, decorators);
     }
 
     isExportDefaultSpecifier(): boolean {
@@ -377,9 +392,7 @@ export default (superClass: typeof Parser) =>
     // Throws if the current token and the prev one are separated by a space.
     assertNoSpace(): void {
       if (this.state.start > this.state.lastTokEndLoc.index) {
-        this.raise(PlaceholderErrors.UnexpectedSpace, {
-          at: this.state.lastTokEndLoc,
-        });
+        this.raise(PlaceholderErrors.UnexpectedSpace, this.state.lastTokEndLoc);
       }
     }
   };

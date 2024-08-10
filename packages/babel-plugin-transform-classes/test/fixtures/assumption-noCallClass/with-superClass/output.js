@@ -4,12 +4,11 @@ var B = /*#__PURE__*/babelHelpers.createClass(function B() {
 var A = /*#__PURE__*/function (_B) {
   "use strict";
 
-  babelHelpers.inherits(A, _B);
-  var _super = babelHelpers.createSuper(A);
   function A(track) {
     var _this;
-    if (track !== undefined) _this = _super.call(this, track);else _this = _super.call(this);
-    return babelHelpers.possibleConstructorReturn(_this);
+    if (track !== undefined) _this = babelHelpers.callSuper(this, A, [track]);else _this = babelHelpers.callSuper(this, A);
+    return babelHelpers.assertThisInitialized(_this);
   }
+  babelHelpers.inherits(A, _B);
   return babelHelpers.createClass(A);
 }(B);

@@ -13,7 +13,7 @@ type State = {
 };
 
 export default declare<State>((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { method, module } = options;
   // Todo(BABEL 8): Consider default it to false

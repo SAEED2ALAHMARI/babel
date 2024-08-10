@@ -12,7 +12,7 @@ const ignoredFeaturesJsonPath = new URL(
 );
 const ignoredFeatures = (
   await import(ignoredFeaturesJsonPath, {
-    assert: { type: "json" },
+    with: { type: "json" },
   })
 ).default;
 
@@ -32,6 +32,7 @@ const ignoredTests = ["built-ins/RegExp/", "language/literals/regexp/"];
 
 const featuresToPlugins = new Map([
   ["import-assertions", "importAssertions"],
+  ["import-attributes", "importAttributes"],
   [
     "decorators",
     [
@@ -39,6 +40,9 @@ const featuresToPlugins = new Map([
       "decoratorAutoAccessors",
     ],
   ],
+  ["explicit-resource-management", "explicitResourceManagement"],
+  ["source-phase-imports", "sourcePhaseImports"],
+  ["source-phase-imports-module-source", "sourcePhaseImports"],
 ]);
 
 const unmappedFeatures = new Set();
@@ -83,12 +87,14 @@ const runner = new TestRunner({
       const fileName = test.file.slice(5).replace(/\\/g, "/");
 
       if (ignoredTests.some(start => fileName.startsWith(start))) continue;
+      if (fileName.endsWith(".md")) continue;
 
       yield {
         contents: test.contents,
         fileName,
         id: `${fileName}(${test.scenario})`,
         sourceType: test.attrs.flags.module ? "module" : "script",
+        createImportExpressions: true,
         plugins: Array.from(getPlugins(test.attrs.features)).flat(),
         expectedError:
           !!test.attrs.negative &&

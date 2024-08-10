@@ -1,11 +1,11 @@
 import { parse } from "@babel/parser";
-
+import { itBabel8 } from "$repo-utils";
 import _traverse, { visitors } from "../lib/index.js";
 const traverse = _traverse.default || _traverse;
 
 describe("visitors", () => {
   describe("merge", () => {
-    (process.env.BABEL_8_BREAKING ? it : it.skip)(
+    itBabel8(
       "should set `_verified` and `_exploded` to `true` if merging catch-all visitors",
       () => {
         const visitor = visitors.merge([{ enter() {} }, { enter() {} }]);

@@ -1,7 +1,6 @@
-import type * as t from "@babel/types";
-import type { NodePath } from "@babel/traverse";
+import type { NodePath, types as t } from "@babel/core";
 
-import { translateEnumValues } from "./enum";
+import { translateEnumValues } from "./enum.ts";
 
 export type NodePathConstEnum = NodePath<t.TSEnumDeclaration & { const: true }>;
 export default function transpileConstEnum(
@@ -52,7 +51,9 @@ export default function transpileConstEnum(
       );
     } else {
       path.replaceWith(
-        t.variableDeclaration("var", [t.variableDeclarator(path.node.id, obj)]),
+        t.variableDeclaration(process.env.BABEL_8_BREAKING ? "const" : "var", [
+          t.variableDeclarator(path.node.id, obj),
+        ]),
       );
       path.scope.registerDeclaration(path);
     }

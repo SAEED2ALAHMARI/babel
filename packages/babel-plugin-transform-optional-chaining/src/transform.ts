@@ -1,10 +1,15 @@
-import { types as t, template } from "@babel/core";
-import type { NodePath } from "@babel/traverse";
+import { types as t, template, type NodePath } from "@babel/core";
 import {
   skipTransparentExprWrapperNodes,
   skipTransparentExprWrappers,
 } from "@babel/helper-skip-transparent-expression-wrappers";
-import { willPathCastToBoolean, findOutermostTransparentParent } from "./util";
+import {
+  willPathCastToBoolean,
+  findOutermostTransparentParent,
+} from "./util.ts";
+
+// TODO(Babel 9): Use .at(-1)
+const last = <T>(arr: T[]) => arr[arr.length - 1];
 
 function isSimpleMemberExpression(
   expression: t.Expression | t.Super,
@@ -35,7 +40,6 @@ function needsMemoize(
   ) {
     const { node } = optionalPath;
     const childPath = skipTransparentExprWrappers(
-      // @ts-expect-error isOptionalMemberExpression does not work with NodePath union
       optionalPath.isOptionalMemberExpression()
         ? optionalPath.get("object")
         : optionalPath.get("callee"),
@@ -92,7 +96,6 @@ export function transformOptionalChain(
     if (node.optional) {
       optionals.push(node);
     }
-    // @ts-expect-error isOptionalMemberExpression does not work with NodePath union
     if (optionalPath.isOptionalMemberExpression()) {
       // @ts-expect-error todo(flow->ts) avoid changing more type
       optionalPath.node.type = "MemberExpression";
@@ -160,7 +163,11 @@ export function transformOptionalChain(
         chainWithTypes as t.Expression,
       );
 
-      isCall ? (node.callee = ref) : (node.object = ref);
+      if (isCall) {
+        node.callee = ref;
+      } else {
+        node.object = ref;
+      }
     }
 
     // Ensure call expressions have the proper `this`
@@ -205,6 +212,14 @@ export function transformOptionalChain(
 
   const ifNullishBoolean = t.isBooleanLiteral(ifNullish);
   const ifNullishFalse = ifNullishBoolean && ifNullish.value === false;
+  const ifNullishVoid =
+    !ifNullishBoolean && t.isUnaryExpression(ifNullish, { operator: "void" });
+
+  const isEvaluationValueIgnored =
+    (t.isExpressionStatement(replacementPath.parent) &&
+      !replacementPath.isCompletionRecord()) ||
+    (t.isSequenceExpression(replacementPath.parent) &&
+      last(replacementPath.parent.expressions) !== replacementPath.node);
 
   // prettier-ignore
   const tpl = ifNullishFalse
@@ -217,7 +232,7 @@ export function transformOptionalChain(
     .reduce((expr, check) => t.logicalExpression(logicalOp, expr, check));
 
   replacementPath.replaceWith(
-    ifNullishBoolean
+    ifNullishBoolean || (ifNullishVoid && isEvaluationValueIgnored)
       ? t.logicalExpression(logicalOp, check, result)
       : t.conditionalExpression(check, ifNullish, result),
   );

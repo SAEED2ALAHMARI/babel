@@ -1,6 +1,5 @@
 import rewritePattern from "regexpu-core";
-import type { NodePath } from "@babel/traverse";
-import { types as t, type PluginObject } from "@babel/core";
+import { types as t, type PluginObject, type NodePath } from "@babel/core";
 import annotateAsPure from "@babel/helper-annotate-as-pure";
 
 import semver from "semver";
@@ -11,8 +10,12 @@ import {
   enableFeature,
   runtimeKey,
   hasFeature,
-} from "./features";
-import { generateRegexpuOptions, canSkipRegexpu, transformFlags } from "./util";
+} from "./features.ts";
+import {
+  generateRegexpuOptions,
+  canSkipRegexpu,
+  transformFlags,
+} from "./util.ts";
 
 const versionKey = "@babel/plugin-regexp-features/version";
 

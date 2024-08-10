@@ -2,7 +2,7 @@ import { declare } from "@babel/helper-plugin-utils";
 import { types as t } from "@babel/core";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   return {
     name: "transform-typeof-symbol",
@@ -22,9 +22,9 @@ export default declare(api => {
 
         if (
           path.parentPath.isBinaryExpression() &&
-          t.EQUALITY_BINARY_OPERATORS.indexOf(
+          t.EQUALITY_BINARY_OPERATORS.includes(
             (parent as t.BinaryExpression).operator,
-          ) >= 0
+          )
         ) {
           // optimise `typeof foo === "string"` since we can determine that they'll never
           // need to handle symbols
@@ -41,7 +41,6 @@ export default declare(api => {
         let isUnderHelper = path.findParent(path => {
           if (path.isFunction()) {
             return (
-              // @ts-expect-error the access is coupled with the shape of typeof helper
               path.get("body.directives.0")?.node.value.value ===
               "@babel/helpers - typeof"
             );

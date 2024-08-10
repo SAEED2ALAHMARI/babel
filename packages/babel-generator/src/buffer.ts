@@ -1,4 +1,7 @@
-import type SourceMap from "./source-map";
+import type SourceMap from "./source-map.ts";
+
+// We inline this package
+// eslint-disable-next-line import/no-extraneous-dependencies
 import * as charcodes from "charcodes";
 
 export type Pos = {
@@ -29,8 +32,13 @@ type QueueItem = {
 };
 
 export default class Buffer {
-  constructor(map?: SourceMap | null) {
+  constructor(map: SourceMap | null, indentChar: string) {
     this._map = map;
+    this._indentChar = indentChar;
+
+    for (let i = 0; i < 64; i++) {
+      this._fastIndentations.push(indentChar.repeat(i));
+    }
 
     this._allocQueue();
   }
@@ -43,6 +51,8 @@ export default class Buffer {
   _queue: QueueItem[] = [];
   _queueCursor = 0;
   _canMarkIdName = true;
+  _indentChar = "";
+  _fastIndentations: string[] = [];
 
   _position = {
     line: 1,
@@ -187,8 +197,9 @@ export default class Buffer {
   /**
    * Same as queue, but this indentation will never have a sourcemap marker.
    */
-  queueIndentation(char: number, repeat: number): void {
-    this._pushQueue(char, repeat, undefined, undefined, undefined);
+  queueIndentation(repeat: number): void {
+    if (repeat === 0) return;
+    this._pushQueue(-1, repeat, undefined, undefined, undefined);
   }
 
   _flush(): void {
@@ -208,10 +219,20 @@ export default class Buffer {
   ): void {
     this._last = char;
 
-    this._str +=
-      repeat > 1
-        ? String.fromCharCode(char).repeat(repeat)
-        : String.fromCharCode(char);
+    if (char === -1) {
+      const fastIndentation = this._fastIndentations[repeat];
+      if (fastIndentation !== undefined) {
+        this._str += fastIndentation;
+      } else {
+        this._str +=
+          repeat > 1 ? this._indentChar.repeat(repeat) : this._indentChar;
+      }
+    } else {
+      this._str +=
+        repeat > 1
+          ? String.fromCharCode(char).repeat(repeat)
+          : String.fromCharCode(char);
+    }
 
     if (char !== charcodes.lineFeed) {
       this._mark(
@@ -244,6 +265,7 @@ export default class Buffer {
     this._last = str.charCodeAt(len - 1);
 
     if (++this._appendCount > 4096) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       +this._str; // Unexplainable huge performance boost. Ref: https://github.com/davidmarkclements/flatstr License: MIT
       this._buf += this._str;
       this._str = str;
@@ -361,9 +383,6 @@ export default class Buffer {
 
   /**
    * check if current _last + queue ends with newline, return the character before newline
-   *
-   * @param {*} ch
-   * @memberof Buffer
    */
   endsWithCharAndNewline(): number {
     const queue = this._queue;
@@ -454,18 +473,6 @@ export default class Buffer {
     if (!this._map) return;
 
     this._normalizePosition(prop, loc, columnOffset);
-  }
-
-  /**
-   * Call a callback with a specific source location
-   */
-
-  withSource(prop: "start" | "end", loc: Loc, cb: () => void): void {
-    if (this._map) {
-      this.source(prop, loc);
-    }
-
-    cb();
   }
 
   _normalizePosition(prop: "start" | "end", loc: Loc, columnOffset: number) {

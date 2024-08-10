@@ -1,4 +1,4 @@
-import type Printer from "../printer";
+import type Printer from "../printer.ts";
 import { isAssignmentPattern, isIdentifier } from "@babel/types";
 import type * as t from "@babel/types";
 import jsesc from "jsesc";
@@ -25,9 +25,11 @@ export function ObjectExpression(this: Printer, node: t.ObjectExpression) {
   this.token("{");
 
   if (props.length) {
+    const exit = this.enterForStatementInit(false);
     this.space();
     this.printList(props, node, { indent: true, statement: true });
     this.space();
+    exit();
   }
 
   this.sourceWithOffset("end", node.loc, -1);
@@ -87,6 +89,8 @@ export function ArrayExpression(this: Printer, node: t.ArrayExpression) {
 
   this.token("[");
 
+  const exit = this.enterForStatementInit(false);
+
   for (let i = 0; i < elems.length; i++) {
     const elem = elems[i];
     if (elem) {
@@ -103,6 +107,8 @@ export function ArrayExpression(this: Printer, node: t.ArrayExpression) {
     }
   }
 
+  exit();
+
   this.token("]");
 }
 
@@ -113,21 +119,26 @@ export function RecordExpression(this: Printer, node: t.RecordExpression) {
 
   let startToken;
   let endToken;
-  if (this.format.recordAndTupleSyntaxType === "bar") {
-    startToken = "{|";
-    endToken = "|}";
-  } else if (
-    this.format.recordAndTupleSyntaxType !== "hash" &&
-    this.format.recordAndTupleSyntaxType != null
-  ) {
-    throw new Error(
-      `The "recordAndTupleSyntaxType" generator option must be "bar" or "hash" (${JSON.stringify(
-        this.format.recordAndTupleSyntaxType,
-      )} received).`,
-    );
-  } else {
+  if (process.env.BABEL_8_BREAKING) {
     startToken = "#{";
     endToken = "}";
+  } else {
+    if (this.format.recordAndTupleSyntaxType === "bar") {
+      startToken = "{|";
+      endToken = "|}";
+    } else if (
+      this.format.recordAndTupleSyntaxType !== "hash" &&
+      this.format.recordAndTupleSyntaxType != null
+    ) {
+      throw new Error(
+        `The "recordAndTupleSyntaxType" generator option must be "bar" or "hash" (${JSON.stringify(
+          this.format.recordAndTupleSyntaxType,
+        )} received).`,
+      );
+    } else {
+      startToken = "#{";
+      endToken = "}";
+    }
   }
 
   this.token(startToken);
@@ -146,16 +157,21 @@ export function TupleExpression(this: Printer, node: t.TupleExpression) {
 
   let startToken;
   let endToken;
-  if (this.format.recordAndTupleSyntaxType === "bar") {
-    startToken = "[|";
-    endToken = "|]";
-  } else if (this.format.recordAndTupleSyntaxType === "hash") {
+  if (process.env.BABEL_8_BREAKING) {
     startToken = "#[";
     endToken = "]";
   } else {
-    throw new Error(
-      `${this.format.recordAndTupleSyntaxType} is not a valid recordAndTuple syntax type`,
-    );
+    if (this.format.recordAndTupleSyntaxType === "bar") {
+      startToken = "[|";
+      endToken = "|]";
+    } else if (this.format.recordAndTupleSyntaxType === "hash") {
+      startToken = "#[";
+      endToken = "]";
+    } else {
+      throw new Error(
+        `${this.format.recordAndTupleSyntaxType} is not a valid recordAndTuple syntax type`,
+      );
+    }
   }
 
   this.token(startToken);
@@ -187,15 +203,16 @@ export function NullLiteral(this: Printer) {
 export function NumericLiteral(this: Printer, node: t.NumericLiteral) {
   const raw = this.getPossibleRaw(node);
   const opts = this.format.jsescOption;
-  const value = node.value + "";
+  const value = node.value;
+  const str = value + "";
   if (opts.numbers) {
-    this.number(jsesc(node.value, opts));
+    this.number(jsesc(value, opts), value);
   } else if (raw == null) {
-    this.number(value); // normalize
+    this.number(str, value); // normalize
   } else if (this.format.minified) {
-    this.number(raw.length < value.length ? raw : value);
+    this.number(raw.length < str.length ? raw : str, value);
   } else {
-    this.number(raw);
+    this.number(raw, value);
   }
 }
 

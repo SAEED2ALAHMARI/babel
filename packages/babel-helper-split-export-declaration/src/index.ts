@@ -7,6 +7,7 @@ import {
   variableDeclarator,
 } from "@babel/types";
 import type * as t from "@babel/types";
+// eslint-disable-next-line import/no-extraneous-dependencies -- TODO: Avoid cycle
 import type { NodePath } from "@babel/traverse";
 
 export default function splitExportDeclaration(
@@ -74,10 +75,7 @@ export default function splitExportDeclaration(
     }
 
     return exportDeclaration;
-  } else if (
-    // @ts-expect-error TS can not narrow down to NodePath<t.ExportNamedDeclaration>
-    exportDeclaration.get("specifiers").length > 0
-  ) {
+  } else if (exportDeclaration.get("specifiers").length > 0) {
     throw new Error("It doesn't make sense to split exported specifiers.");
   }
 

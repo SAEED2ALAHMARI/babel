@@ -1,45 +1,35 @@
 import stripAnsi from "strip-ansi";
-import chalk from "chalk";
+import colors, { createColors } from "picocolors";
 import _codeFrame, { codeFrameColumns } from "../lib/index.js";
 const codeFrame = _codeFrame.default || _codeFrame;
 
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const babelHighlightChalk = require(require.resolve("chalk", {
-  paths: [require.resolve("@babel/highlight")],
-}));
+const babelHighlightPicocolors = require(
+  require.resolve("picocolors", {
+    paths: [require.resolve("@babel/highlight")],
+  }),
+);
+
+const compose = (f, g) => v => f(g(v));
 
 describe("@babel/code-frame", function () {
-  function stubColorSupport(supported) {
-    let originalChalkEnabled;
-    let originalChalkLevel;
-    let originalChalkSupportsColor;
-    let originalHighlightChalkEnabled;
-    let originalHighlightChalkLevel;
-    let originalHighlightChalkSupportsColor;
+  function stubColorSupport(colors, supported) {
+    let originalColorsCopy;
 
     beforeEach(function () {
-      originalChalkSupportsColor = chalk.supportsColor;
-      originalChalkLevel = chalk.level;
-      originalChalkEnabled = chalk.enabled;
-      originalHighlightChalkSupportsColor = babelHighlightChalk.supportsColor;
-      originalHighlightChalkLevel = babelHighlightChalk.level;
-      originalHighlightChalkEnabled = babelHighlightChalk.enabled;
-
-      babelHighlightChalk.supportsColor = chalk.supportsColor = supported
-        ? { level: 1 }
-        : false;
-      babelHighlightChalk.level = chalk.level = supported ? 1 : 0;
-      babelHighlightChalk.enabled = chalk.enabled = supported;
+      if (supported === colors.isColorSupported) {
+        originalColorsCopy = null;
+      } else {
+        originalColorsCopy = { ...colors };
+        Object.assign(colors, createColors(supported));
+      }
     });
 
     afterEach(function () {
-      chalk.supportsColor = originalChalkSupportsColor;
-      chalk.level = originalChalkLevel;
-      chalk.enabled = originalChalkEnabled;
-      babelHighlightChalk.supportsColor = originalHighlightChalkSupportsColor;
-      babelHighlightChalk.level = originalHighlightChalkLevel;
-      babelHighlightChalk.enabled = originalHighlightChalkEnabled;
+      if (originalColorsCopy) {
+        Object.assign(colors, originalColorsCopy);
+      }
     });
   }
 
@@ -133,7 +123,8 @@ describe("@babel/code-frame", function () {
   });
 
   describe("when colors are supported", () => {
-    stubColorSupport(true);
+    stubColorSupport(colors, true);
+    stubColorSupport(babelHighlightPicocolors, true);
 
     test("opts.highlightCode", function () {
       const rawLines = "console.log('babel')";
@@ -185,8 +176,8 @@ describe("@babel/code-frame", function () {
       );
     });
     test("opts.forceColor", function () {
-      const marker = chalk.red.bold;
-      const gutter = chalk.grey;
+      const marker = compose(colors.red, colors.bold);
+      const gutter = colors.gray;
 
       const rawLines = ["", "", "", ""].join("\n");
       expect(
@@ -196,7 +187,7 @@ describe("@babel/code-frame", function () {
           forceColor: true,
         }),
       ).toEqual(
-        chalk.reset(
+        colors.reset(
           [
             " " + gutter(" 2 |"),
             marker(">") + gutter(" 3 |"),
@@ -207,8 +198,8 @@ describe("@babel/code-frame", function () {
     });
 
     test("jsx", function () {
-      const gutter = chalk.grey;
-      const yellow = chalk.yellow;
+      const gutter = colors.gray;
+      const yellow = colors.yellow;
 
       const rawLines = ["<div />"].join("\n");
 
@@ -222,7 +213,7 @@ describe("@babel/code-frame", function () {
         ),
       ).toEqual(
         JSON.stringify(
-          chalk.reset(
+          colors.reset(
             " " +
               gutter(" 1 |") +
               " " +

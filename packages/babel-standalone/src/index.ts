@@ -4,11 +4,9 @@
  * plugins, instead explicitly registering all the available plugins and
  * presets, and requiring custom ones to be registered through `registerPlugin`
  * and `registerPreset` respectively.
- * @flow
  */
 
 /* global VERSION */
-/* eslint-disable max-len */
 /// <reference lib="dom" />
 
 import {
@@ -18,26 +16,28 @@ import {
   type PluginObject,
   type PresetObject,
 } from "@babel/core";
-import { all } from "./generated/plugins";
-import preset2015 from "./preset-es2015";
-import presetStage0 from "./preset-stage-0";
-import presetStage1 from "./preset-stage-1";
-import presetStage2 from "./preset-stage-2";
-import presetStage3 from "./preset-stage-3";
+import { all } from "./generated/plugins.ts";
+import preset2015 from "./preset-es2015.ts";
+import presetStage0 from "./preset-stage-0.ts";
+import presetStage1 from "./preset-stage-1.ts";
+import presetStage2 from "./preset-stage-2.ts";
+import presetStage3 from "./preset-stage-3.ts";
 import presetEnv from "@babel/preset-env";
 import presetFlow from "@babel/preset-flow";
 import presetReact from "@babel/preset-react";
 import presetTypescript from "@babel/preset-typescript";
 import type { InputOptions } from "@babel/core";
 
-import { runScripts } from "./transformScriptTags";
+import { runScripts } from "./transformScriptTags.ts";
+
+export * as packages from "./packages.ts";
 
 // We import this file from another package using a relative path because it's
 // meant to just be build-time script; it's ok because @babel/standalone is
 // bundled anyway.
 // TODO: Remove this in Babel 8
 // @ts-expect-error TS complains about importing a JS file without type declarations
-import legacyPluginAliases from "../../babel-compat-data/scripts/data/legacy-plugin-aliases";
+import legacyPluginAliases from "../../babel-compat-data/scripts/data/legacy-plugin-aliases.js";
 // eslint-disable-next-line guard-for-in
 for (const name in legacyPluginAliases) {
   all[legacyPluginAliases[name]] = all[name];
@@ -96,7 +96,7 @@ const isArray =
  */
 function loadBuiltin(builtinTable: Record<string, unknown>, name: any) {
   if (isArray(name) && typeof name[0] === "string") {
-    if (Object.prototype.hasOwnProperty.call(builtinTable, name[0])) {
+    if (Object.hasOwn(builtinTable, name[0])) {
       return [builtinTable[name[0]]].concat(name.slice(1));
     }
     return;
@@ -122,7 +122,7 @@ function processOptions(options: InputOptions) {
       if (
         isArray(preset) &&
         typeof preset[0] === "object" &&
-        Object.prototype.hasOwnProperty.call(preset[0], "buildPreset")
+        Object.hasOwn(preset[0], "buildPreset")
       ) {
         preset[0] = { ...preset[0], buildPreset: preset[0].buildPreset };
       }
@@ -171,7 +171,7 @@ export const buildExternalHelpers = babelBuildExternalHelpers;
  * Registers a named plugin for use with Babel.
  */
 export function registerPlugin(name: string, plugin: () => PluginObject): void {
-  if (Object.prototype.hasOwnProperty.call(availablePlugins, name)) {
+  if (Object.hasOwn(availablePlugins, name)) {
     console.warn(
       `A plugin named "${name}" is already registered, it will be overridden`,
     );
@@ -194,7 +194,7 @@ export function registerPlugins(newPlugins: {
  * Registers a named preset for use with Babel.
  */
 export function registerPreset(name: string, preset: () => PresetObject): void {
-  if (Object.prototype.hasOwnProperty.call(availablePresets, name)) {
+  if (Object.hasOwn(availablePresets, name)) {
     if (name === "env") {
       console.warn(
         "@babel/preset-env is now included in @babel/standalone, please remove @babel/preset-env-standalone",

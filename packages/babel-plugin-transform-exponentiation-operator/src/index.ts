@@ -3,7 +3,7 @@ import build from "@babel/helper-builder-binary-assignment-operator-visitor";
 import { types as t } from "@babel/core";
 
 export default declare(api => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   return {
     name: "transform-exponentiation-operator",

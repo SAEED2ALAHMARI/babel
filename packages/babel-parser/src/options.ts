@@ -1,32 +1,35 @@
-import type { PluginList } from "./plugin-utils";
+import type { PluginList } from "./plugin-utils.ts";
 
 // A second optional argument can be given to further configure
 // the parser process. These options are recognized:
 
 export type SourceType = "script" | "module" | "unambiguous";
 
-export type Options = {
-  sourceType: SourceType;
+export interface Options {
+  sourceType?: SourceType;
   sourceFilename?: string;
-  startColumn: number;
-  startLine: number;
-  allowAwaitOutsideFunction: boolean;
-  allowReturnOutsideFunction: boolean;
-  allowNewTargetOutsideFunction: boolean;
-  allowImportExportEverywhere: boolean;
-  allowSuperOutsideMethod: boolean;
-  allowUndeclaredExports: boolean;
-  plugins: PluginList;
-  strictMode: boolean | undefined | null;
-  ranges: boolean;
-  tokens: boolean;
-  createParenthesizedExpressions: boolean;
-  errorRecovery: boolean;
-  attachComment: boolean;
-  annexB: boolean;
-};
+  startColumn?: number;
+  startLine?: number;
+  allowAwaitOutsideFunction?: boolean;
+  allowReturnOutsideFunction?: boolean;
+  allowNewTargetOutsideFunction?: boolean;
+  allowImportExportEverywhere?: boolean;
+  allowSuperOutsideMethod?: boolean;
+  allowUndeclaredExports?: boolean;
+  plugins?: PluginList;
+  strictMode?: boolean | undefined | null;
+  ranges?: boolean;
+  tokens?: boolean;
+  createImportExpressions?: boolean;
+  createParenthesizedExpressions?: boolean;
+  errorRecovery?: boolean;
+  attachComment?: boolean;
+  annexB?: boolean;
+}
 
-export const defaultOptions: Options = {
+type OptionsWithDefaults = { [P in keyof Options]-?: Options[P] };
+
+export const defaultOptions: OptionsWithDefaults = {
   // Source type ("script" or "module") for different semantics
   sourceType: "script",
   // Source filename.
@@ -68,6 +71,9 @@ export const defaultOptions: Options = {
   ranges: false,
   // Adds all parsed tokens to a `tokens` property on the `File` node
   tokens: false,
+  // Whether to create ImportExpression AST nodes (if false
+  // `import(foo)` will be parsed as CallExpression(Import, [Identifier(foo)])
+  createImportExpressions: process.env.BABEL_8_BREAKING ? true : false,
   // Whether to create ParenthesizedExpression AST nodes (if false
   // the parser sets extra.parenthesized on the expression nodes instead).
   createParenthesizedExpressions: false,
@@ -86,7 +92,7 @@ export const defaultOptions: Options = {
 
 // Interpret and default an options object
 
-export function getOptions(opts?: Options | null): Options {
+export function getOptions(opts?: Options | null): OptionsWithDefaults {
   if (opts == null) {
     return { ...defaultOptions };
   }

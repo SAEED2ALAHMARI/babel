@@ -1,5 +1,5 @@
-import presetStage1 from "./preset-stage-1";
-import { proposalFunctionBind } from "./generated/plugins";
+import presetStage1 from "./preset-stage-1.ts";
+import { proposalFunctionBind } from "./generated/plugins.ts";
 
 export default (_: any, opts: any = {}) => {
   const {
@@ -10,7 +10,6 @@ export default (_: any, opts: any = {}) => {
     decoratorsBeforeExport,
     pipelineProposal,
     pipelineTopicToken,
-    importAssertionsVersion = "september-2020",
   } = opts;
 
   return {
@@ -25,7 +24,6 @@ export default (_: any, opts: any = {}) => {
           decoratorsBeforeExport,
           pipelineProposal,
           pipelineTopicToken,
-          importAssertionsVersion,
         },
       ],
     ],

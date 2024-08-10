@@ -1,5 +1,5 @@
-var _class;
-var _getA = /*#__PURE__*/Symbol("getA");
+var _A;
+var _getA = Symbol("getA");
 class A {
   constructor() {
     Object.defineProperty(this, _getA, {
@@ -8,7 +8,7 @@ class A {
     });
   }
 }
-_class = A;
+_A = A;
 function _get_getA() {
-  return _class;
+  return _A;
 }

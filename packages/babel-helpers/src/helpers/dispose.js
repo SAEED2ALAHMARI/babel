@@ -1,10 +1,12 @@
 /* @minVersion 7.22.0 */
-function dispose_SuppressedError(suppressed, error) {
+/* @onlyBabel7 */
+
+function dispose_SuppressedError(error, suppressed) {
   if (typeof SuppressedError !== "undefined") {
     // eslint-disable-next-line no-undef
     dispose_SuppressedError = SuppressedError;
   } else {
-    dispose_SuppressedError = function SuppressedError(suppressed, error) {
+    dispose_SuppressedError = function SuppressedError(error, suppressed) {
       this.suppressed = suppressed;
       this.error = error;
       this.stack = new Error().stack;
@@ -17,7 +19,7 @@ function dispose_SuppressedError(suppressed, error) {
       },
     });
   }
-  return new dispose_SuppressedError(suppressed, error);
+  return new dispose_SuppressedError(error, suppressed);
 }
 
 export default function _dispose(stack, error, hasError) {
@@ -35,7 +37,7 @@ export default function _dispose(stack, error, hasError) {
   }
 
   function err(e) {
-    error = hasError ? new dispose_SuppressedError(e, error) : e;
+    error = hasError ? new dispose_SuppressedError(error, e) : e;
     hasError = true;
 
     return next();

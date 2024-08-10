@@ -8,7 +8,7 @@ import {
   validateOptional,
   validateOptionalType,
   validateType,
-} from "./utils";
+} from "./utils.ts";
 
 const defineType = defineAliasedType("Flow");
 
@@ -303,7 +303,8 @@ defineType("ObjectTypeAnnotation", {
 });
 
 defineType("ObjectTypeInternalSlot", {
-  visitor: ["id", "value", "optional", "static", "method"],
+  visitor: ["id", "value"],
+  builder: ["id", "value", "optional", "static", "method"],
   aliases: ["UserWhitespacable"],
   fields: {
     id: validateType("Identifier"),

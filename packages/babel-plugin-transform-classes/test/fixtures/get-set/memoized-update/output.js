@@ -20,13 +20,12 @@ const proper = {
   }
 };
 let Obj = /*#__PURE__*/function (_Base) {
-  babelHelpers.inherits(Obj, _Base);
-  var _super = babelHelpers.createSuper(Obj);
   function Obj() {
     babelHelpers.classCallCheck(this, Obj);
-    return _super.apply(this, arguments);
+    return babelHelpers.callSuper(this, Obj, arguments);
   }
-  babelHelpers.createClass(Obj, [{
+  babelHelpers.inherits(Obj, _Base);
+  return babelHelpers.createClass(Obj, [{
     key: "update",
     value: function update() {
       var _proper$prop, _super$proper$prop, _super$proper$prop2;
@@ -39,7 +38,6 @@ let Obj = /*#__PURE__*/function (_Base) {
       babelHelpers.set(babelHelpers.getPrototypeOf(Obj.prototype), _i = i, (_super$i = babelHelpers.get(babelHelpers.getPrototypeOf(Obj.prototype), _i, this), _super$i2 = _super$i++, _super$i), this, true), _super$i2;
     }
   }]);
-  return Obj;
 }(Base);
 const obj = new Obj();
 obj.update();

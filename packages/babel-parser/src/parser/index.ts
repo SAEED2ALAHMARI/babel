@@ -1,9 +1,9 @@
-import type { Options } from "../options";
-import type * as N from "../types";
-import type { PluginList } from "../plugin-utils";
-import { getOptions } from "../options";
-import StatementParser from "./statement";
-import ScopeHandler from "../util/scope";
+import type { Options } from "../options.ts";
+import type * as N from "../types.ts";
+import type { PluginList } from "../plugin-utils.ts";
+import { getOptions } from "../options.ts";
+import StatementParser from "./statement.ts";
+import ScopeHandler from "../util/scope.ts";
 
 export type PluginsMap = Map<
   string,
@@ -30,21 +30,20 @@ export default class Parser extends StatementParser {
   }
 
   // This can be overwritten, for example, by the TypeScript plugin.
-  getScopeHandler(): {
-    new (...args: any): ScopeHandler;
-  } {
+  getScopeHandler(): new (...args: any) => ScopeHandler {
     return ScopeHandler;
   }
 
   parse(): N.File {
     this.enterInitialScopes();
-    const file = this.startNode() as N.File;
-    const program = this.startNode() as N.Program;
+    const file = this.startNode<N.File>();
+    const program = this.startNode<N.Program>();
     this.nextToken();
     file.errors = null;
     this.parseTopLevel(file, program);
     file.errors = this.state.errors;
-    return file;
+    file.comments.length = this.state.commentsLen;
+    return file as N.File;
   }
 }
 

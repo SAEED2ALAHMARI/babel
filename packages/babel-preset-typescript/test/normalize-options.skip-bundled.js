@@ -1,8 +1,9 @@
 import _normalizeOptions from "../lib/normalize-options.js";
 const normalizeOptions = _normalizeOptions.default || _normalizeOptions;
+import { describeBabel8, describeBabel7 } from "$repo-utils";
 
 describe("normalize options", () => {
-  (process.env.BABEL_8_BREAKING ? describe : describe.skip)("Babel 8", () => {
+  describeBabel8("Babel 8", () => {
     it("should throw on unknown options", () => {
       expect(() => normalizeOptions({ allowNamespace: true })).toThrow(
         "@babel/preset-typescript: 'allowNamespace' is not a valid top-level option.\n- Did you mean 'allowNamespaces'?",
@@ -47,11 +48,12 @@ describe("normalize options", () => {
           "jsxPragmaFrag": "React.Fragment",
           "onlyRemoveTypeImports": true,
           "optimizeConstEnums": false,
+          "rewriteImportExtensions": false,
         }
       `);
     });
   });
-  (process.env.BABEL_8_BREAKING ? describe.skip : describe)("Babel 7", () => {
+  describeBabel7("Babel 7", () => {
     it("should not throw on unknown options", () => {
       expect(() => normalizeOptions({ allowNamespace: true })).not.toThrow();
     });
@@ -95,6 +97,7 @@ describe("normalize options", () => {
           "jsxPragmaFrag": "React.Fragment",
           "onlyRemoveTypeImports": undefined,
           "optimizeConstEnums": false,
+          "rewriteImportExtensions": false,
         }
       `);
     });

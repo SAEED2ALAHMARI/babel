@@ -1,12 +1,11 @@
-import type { NodePath, Scope, Visitor } from "@babel/traverse";
+import type { NodePath, Scope, Visitor, File } from "@babel/core";
 import nameFunction from "@babel/helper-function-name";
 import ReplaceSupers from "@babel/helper-replace-supers";
 import environmentVisitor from "@babel/helper-environment-visitor";
-import optimiseCall from "@babel/helper-optimise-call-expression";
-import { traverse, template, types as t, type File } from "@babel/core";
+import { traverse, template, types as t } from "@babel/core";
 import annotateAsPure from "@babel/helper-annotate-as-pure";
 
-import addCreateSuperHelper from "./inline-createSuper-helpers";
+import addCallSuperHelper from "./inline-callSuper-helpers.ts";
 
 type ClassAssumptions = {
   setClassMethods: boolean;
@@ -48,7 +47,6 @@ type State = {
 
   classId: t.Identifier | void;
   classRef: t.Identifier;
-  superFnId: t.Identifier;
   superName: t.Expression | null;
   superReturns: NodePath<t.ReturnStatement>[];
   isDerived: boolean;
@@ -62,7 +60,6 @@ type State = {
 
   body: t.Statement[];
   superThises: NodePath<t.ThisExpression>[];
-  pushedConstructor: boolean;
   pushedInherits: boolean;
   pushedCreateClass: boolean;
   protoAlias: t.Identifier | null;
@@ -109,7 +106,6 @@ export default function transformClass(
 
     classId: undefined,
     classRef: undefined,
-    superFnId: undefined,
     superName: null,
     superReturns: [],
     isDerived: false,
@@ -123,7 +119,6 @@ export default function transformClass(
 
     body: [],
     superThises: [],
-    pushedConstructor: false,
     pushedInherits: false,
     pushedCreateClass: false,
     protoAlias: null,
@@ -214,7 +209,7 @@ export default function transformClass(
     for (const path of classBodyPaths) {
       const node = path.node;
 
-      if (path.isClassProperty()) {
+      if (path.isClassProperty() || path.isClassPrivateProperty()) {
         throw path.buildCodeFrameError("Missing class properties transform.");
       }
 
@@ -304,7 +299,7 @@ export default function transformClass(
       }
       args = args.slice(0, lastNonNullIndex + 1);
 
-      body.push(t.expressionStatement(createClassHelper(args)));
+      body.push(t.returnStatement(createClassHelper(args)));
       classState.pushedCreateClass = true;
     }
   }
@@ -342,12 +337,41 @@ export default function transformClass(
 
       call = t.logicalExpression("||", bareSuperNode, t.thisExpression());
     } else {
-      call = optimiseCall(
-        t.cloneNode(classState.superFnId),
+      const args: t.Expression[] = [
         t.thisExpression(),
-        bareSuperNode.arguments,
-        false,
-      );
+        t.cloneNode(classState.classRef),
+      ];
+      if (bareSuperNode.arguments?.length) {
+        const bareSuperNodeArguments = bareSuperNode.arguments as (
+          | t.Expression
+          | t.SpreadElement
+        )[];
+
+        /**
+         * test262/test/language/expressions/super/call-spread-err-sngl-err-itr-get-get.js
+         *
+         * var iter = {};
+         * Object.defineProperty(iter, Symbol.iterator, {
+         *   get: function() {
+         *     throw new Test262Error();
+         *   }
+         * })
+         * super(...iter);
+         */
+
+        if (
+          bareSuperNodeArguments.length === 1 &&
+          t.isSpreadElement(bareSuperNodeArguments[0]) &&
+          t.isIdentifier(bareSuperNodeArguments[0].argument, {
+            name: "arguments",
+          })
+        ) {
+          args.push(bareSuperNodeArguments[0].argument);
+        } else {
+          args.push(t.arrayExpression(bareSuperNodeArguments));
+        }
+      }
+      call = t.callExpression(addCallSuperHelper(classState.file), args);
     }
 
     if (
@@ -374,26 +398,25 @@ export default function transformClass(
     const path = classState.userConstructorPath;
     const body = path.get("body");
 
+    const constructorBody = path.get("body");
+
+    let maxGuaranteedSuperBeforeIndex = constructorBody.node.body.length;
+
     path.traverse(findThisesVisitor);
 
     let thisRef = function () {
       const ref = path.scope.generateDeclaredUidIdentifier("this");
+      maxGuaranteedSuperBeforeIndex++;
       thisRef = () => t.cloneNode(ref);
       return ref;
     };
 
-    for (const thisPath of classState.superThises) {
-      const { node, parentPath } = thisPath;
-      if (parentPath.isMemberExpression({ object: node })) {
-        thisPath.replaceWith(thisRef());
-        continue;
-      }
-      thisPath.replaceWith(
-        t.callExpression(classState.file.addHelper("assertThisInitialized"), [
-          thisRef(),
-        ]),
+    const buildAssertThisInitialized = function () {
+      return t.callExpression(
+        classState.file.addHelper("assertThisInitialized"),
+        [thisRef()],
       );
-    }
+    };
 
     const bareSupers: NodePath<t.CallExpression>[] = [];
     path.traverse(
@@ -410,15 +433,18 @@ export default function transformClass(
       ]),
     );
 
-    let guaranteedSuperBeforeFinish = !!bareSupers.length;
-
     for (const bareSuper of bareSupers) {
       wrapSuperCall(bareSuper, classState.superName, thisRef, body);
 
-      if (guaranteedSuperBeforeFinish) {
+      if (maxGuaranteedSuperBeforeIndex >= 0) {
+        let lastParentPath: NodePath;
         bareSuper.find(function (parentPath) {
           // hit top so short circuit
-          if (parentPath === path) {
+          if (parentPath === constructorBody) {
+            maxGuaranteedSuperBeforeIndex = Math.min(
+              maxGuaranteedSuperBeforeIndex,
+              lastParentPath.key as number,
+            );
             return true;
           }
 
@@ -427,10 +453,37 @@ export default function transformClass(
             parentPath.isConditional() ||
             parentPath.isArrowFunctionExpression()
           ) {
-            guaranteedSuperBeforeFinish = false;
+            maxGuaranteedSuperBeforeIndex = -1;
             return true;
           }
+
+          lastParentPath = parentPath;
         });
+      }
+    }
+
+    for (const thisPath of classState.superThises) {
+      const { node, parentPath } = thisPath;
+      if (parentPath.isMemberExpression({ object: node })) {
+        thisPath.replaceWith(thisRef());
+        continue;
+      }
+
+      let thisIndex: number;
+      thisPath.find(function (parentPath) {
+        if (parentPath.parentPath === constructorBody) {
+          thisIndex = parentPath.key as number;
+          return true;
+        }
+      });
+
+      if (
+        maxGuaranteedSuperBeforeIndex !== -1 &&
+        thisIndex > maxGuaranteedSuperBeforeIndex
+      ) {
+        thisPath.replaceWith(thisRef());
+      } else {
+        thisPath.replaceWith(buildAssertThisInitialized());
       }
     }
 
@@ -438,10 +491,7 @@ export default function transformClass(
 
     if (classState.isLoose) {
       wrapReturn = (returnArg: t.Expression | void) => {
-        const thisExpr = t.callExpression(
-          classState.file.addHelper("assertThisInitialized"),
-          [thisRef()],
-        );
+        const thisExpr = buildAssertThisInitialized();
         return returnArg
           ? t.logicalExpression("||", returnArg, thisExpr)
           : thisExpr;
@@ -462,11 +512,16 @@ export default function transformClass(
     // if we have a return as the last node in the body then we've already caught that
     // return
     const bodyPaths = body.get("body");
+    const guaranteedSuperBeforeFinish =
+      maxGuaranteedSuperBeforeIndex !== -1 &&
+      maxGuaranteedSuperBeforeIndex < bodyPaths.length;
     if (!bodyPaths.length || !bodyPaths.pop().isReturnStatement()) {
       body.pushContainer(
         "body",
         t.returnStatement(
-          guaranteedSuperBeforeFinish ? thisRef() : wrapReturn(),
+          guaranteedSuperBeforeFinish
+            ? thisRef()
+            : buildAssertThisInitialized(),
         ),
       );
     }
@@ -637,20 +692,11 @@ export default function transformClass(
     t.inherits(construct.body, method.body);
     construct.body.directives = method.body.directives;
 
-    pushConstructorToBody();
-  }
-
-  function pushConstructorToBody() {
-    if (classState.pushedConstructor) return;
-    classState.pushedConstructor = true;
-
     // we haven't pushed any descriptors yet
     // @ts-expect-error todo(flow->ts) maybe remove this block - properties from condition are not used anywhere else
     if (classState.hasInstanceDescriptors || classState.hasStaticDescriptors) {
       pushDescriptors();
     }
-
-    classState.body.push(classState.construct);
 
     pushInheritsToBody();
   }
@@ -661,25 +707,10 @@ export default function transformClass(
   function pushInheritsToBody() {
     if (!classState.isDerived || classState.pushedInherits) return;
 
-    const superFnId = path.scope.generateUidIdentifier("super");
-
-    setState({ pushedInherits: true, superFnId });
+    classState.pushedInherits = true;
 
     // Unshift to ensure that the constructor inheritance is set up before
     // any properties can be assigned to the prototype.
-
-    if (!assumptions.superIsCallableConstructor) {
-      classState.body.unshift(
-        t.variableDeclaration("var", [
-          t.variableDeclarator(
-            superFnId,
-            t.callExpression(addCreateSuperHelper(classState.file), [
-              t.cloneNode(classState.classRef),
-            ]),
-          ),
-        ]),
-      );
-    }
 
     classState.body.unshift(
       t.expressionStatement(
@@ -800,7 +831,7 @@ export default function transformClass(
     }
 
     const isStrict = path.isInStrictMode();
-    let constructorOnly = classState.classId && body.length === 1;
+    let constructorOnly = classState.classId && body.length === 0;
     if (constructorOnly && !isStrict) {
       for (const param of classState.construct.params) {
         // It's illegal to put a use strict directive into the body of a function
@@ -814,8 +845,7 @@ export default function transformClass(
     }
 
     const directives = constructorOnly
-      ? (body[0] as t.FunctionExpression | t.FunctionDeclaration).body
-          .directives
+      ? classState.construct.body.directives
       : [];
     if (!isStrict) {
       directives.push(t.directive(t.directiveLiteral("use strict")));
@@ -823,18 +853,22 @@ export default function transformClass(
 
     if (constructorOnly) {
       // named class with only a constructor
-      const expr = t.toExpression(
-        body[0] as t.FunctionExpression | t.FunctionDeclaration,
-      );
+      const expr = t.toExpression(classState.construct);
       return classState.isLoose ? expr : createClassHelper([expr]);
     }
 
-    let returnArg: t.Expression = t.cloneNode(classState.classRef);
-    if (!classState.pushedCreateClass && !classState.isLoose) {
-      returnArg = createClassHelper([returnArg]);
+    if (!classState.pushedCreateClass) {
+      body.push(
+        t.returnStatement(
+          classState.isLoose
+            ? t.cloneNode(classState.classRef)
+            : createClassHelper([t.cloneNode(classState.classRef)]),
+        ),
+      );
     }
 
-    body.push(t.returnStatement(returnArg));
+    body.unshift(classState.construct);
+
     const container = t.arrowFunctionExpression(
       closureParams,
       t.blockStatement(body, directives),

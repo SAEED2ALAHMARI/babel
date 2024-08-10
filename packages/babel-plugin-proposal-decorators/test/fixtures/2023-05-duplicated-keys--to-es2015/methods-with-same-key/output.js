@@ -1,7 +1,8 @@
-var _initProto, _class;
+var _Foo;
+let _initProto;
 const dec = () => {};
 class Foo {
-  constructor(...args) {
+  constructor() {
     _initProto(this);
   }
   a() {
@@ -11,5 +12,5 @@ class Foo {
     return 2;
   }
 }
-_class = Foo;
-[_initProto] = babelHelpers.applyDecs2305(_class, [[dec, 2, "a"], [dec, 2, "a"]], []).e;
+_Foo = Foo;
+[_initProto] = babelHelpers.applyDecs2305(_Foo, [[dec, 2, "a"], [dec, 2, "a"]], []).e;

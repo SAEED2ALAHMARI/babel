@@ -135,6 +135,13 @@ export interface ParserOptions {
    * AST nodes instead of using the `extra` property.
    */
   createParenthesizedExpressions?: boolean;
+
+  /**
+   * The default is false in Babel 7 and true in Babel 8
+   * Set this to true to parse it as an `ImportExpression` node.
+   * Otherwise `import(foo)` is parsed as `CallExpression(Import, [Identifier(foo)])`.
+   */
+  createImportExpressions?: boolean;
 }
 
 export type ParserPlugin = import("../src/typings").PluginConfig;

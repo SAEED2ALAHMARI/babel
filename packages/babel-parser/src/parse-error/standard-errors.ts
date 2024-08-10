@@ -1,4 +1,5 @@
-import toNodeDescription from "./to-node-description";
+import type { ParseErrorTemplates } from "../parse-error.ts";
+import toNodeDescription from "./to-node-description.ts";
 
 export type LValAncestor =
   | { type: "UpdateExpression"; prefix: boolean }
@@ -51,7 +52,7 @@ export default {
   DeclarationMissingInitializer: ({
     kind,
   }: {
-    kind: "const" | "destructuring";
+    kind: "await using" | "const" | "destructuring" | "using";
   }) => `Missing initializer in ${kind} declaration.`,
   DecoratorArgumentsOutsideParentheses:
     "Decorator arguments must be moved inside parentheses: use '@(decorator(args))' instead of '@(decorator)(args)'.",
@@ -65,6 +66,8 @@ export default {
     "Decorators must be placed *after* the 'export' keyword. Remove the 'decoratorsBeforeExport: false' option to use the '@decorator export class {}' syntax.",
   DecoratorSemicolon: "Decorators must not be followed by a semicolon.",
   DecoratorStaticBlock: "Decorators can't be used with a static block.",
+  DeferImportRequiresNamespace:
+    'Only `import defer * as x from "./module"` is valid.',
   DeletePrivateField: "Deleting a private field is not allowed.",
   DestructureNamedImport:
     "ES2015 named imports do not destructure. Use another statement for destructuring after the import.",
@@ -74,6 +77,8 @@ export default {
     `\`${exportName}\` has already been exported. Exported identifiers must be unique.`,
   DuplicateProto: "Redefinition of __proto__ property.",
   DuplicateRegExpFlags: "Duplicate regular expression flag.",
+  DynamicImportPhaseRequiresImportExpressions: ({ phase }: { phase: string }) =>
+    `'import.${phase}(...)' can only be parsed when using the 'createImportExpressions' option.`,
   ElementAfterRest: "Rest element must be last element.",
   EscapedCharNotAnIdentifier: "Invalid Unicode escape.",
   ExportBindingIsString: ({
@@ -146,6 +151,10 @@ export default {
     `Invalid left-hand side in ${toNodeDescription(ancestor)}.`,
   InvalidLhsBinding: ({ ancestor }: { ancestor: LValAncestor }) =>
     `Binding invalid left-hand side in ${toNodeDescription(ancestor)}.`,
+  InvalidLhsOptionalChaining: ({ ancestor }: { ancestor: LValAncestor }) =>
+    `Invalid optional chaining in the left-hand side of ${toNodeDescription(
+      ancestor,
+    )}.`,
   InvalidNumber: "Invalid number.",
   InvalidOrMissingExponent:
     "Floating-point numbers require a valid exponent after the 'e'.",
@@ -163,8 +172,7 @@ export default {
   InvalidRestAssignmentPattern: "Invalid rest operator's argument.",
   LabelRedeclaration: ({ labelName }: { labelName: string }) =>
     `Label '${labelName}' is already declared.`,
-  LetInLexicalBinding:
-    "'let' is not allowed to be used as a name in 'let' or 'const' declarations.",
+  LetInLexicalBinding: "'let' is disallowed as a lexically bound name.",
   LineTerminatorBeforeArrow: "No line break is allowed before '=>'.",
   MalformedRegExpFlags: "Invalid regular expression flag.",
   MissingClassName: "A class name is required.",
@@ -233,6 +241,8 @@ export default {
     "In non-strict mode code, functions can only be declared at top level or inside a block.",
   SloppyFunctionAnnexB:
     "In non-strict mode code, functions can only be declared at top level, inside a block, or as the body of an if statement.",
+  SourcePhaseImportRequiresDefault:
+    'Only `import source x from "./module"` is valid.',
   StaticPrototype: "Classes may not have static property named prototype.",
   SuperNotAllowed:
     "`super()` is only valid inside a class constructor of a subclass. Maybe a typo in the method name ('constructor') or not extending another class?",
@@ -303,6 +313,7 @@ export default {
   UnterminatedRegExp: "Unterminated regular expression.",
   UnterminatedString: "Unterminated string constant.",
   UnterminatedTemplate: "Unterminated template.",
+  UsingDeclarationExport: "Using declaration cannot be exported.",
   UsingDeclarationHasBindingPattern:
     "Using declaration cannot have destructuring patterns.",
   VarRedeclaration: ({ identifierName }: { identifierName: string }) =>
@@ -312,4 +323,4 @@ export default {
   YieldInParameter: "Yield expression is not allowed in formal parameters.",
   ZeroDigitNumericSeparator:
     "Numeric separator can not be used after leading 0.",
-};
+} satisfies ParseErrorTemplates;

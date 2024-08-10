@@ -11,7 +11,7 @@ export interface Options {
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   return createClassFeaturePlugin({
     name: "transform-private-methods",

@@ -1,15 +1,15 @@
 import semver from "semver";
 import type { Targets } from "@babel/helper-compilation-targets";
 
-import { version as coreVersion } from "../../";
-import { assertSimpleType } from "../caching";
+import { version as coreVersion } from "../../index.ts";
+import { assertSimpleType } from "../caching.ts";
 import type {
   CacheConfigurator,
   SimpleCacheConfigurator,
   SimpleType,
-} from "../caching";
+} from "../caching.ts";
 
-import type { AssumptionName, CallerMetadata } from "../validation/options";
+import type { AssumptionName, CallerMetadata } from "../validation/options.ts";
 
 import type * as Context from "../cache-contexts";
 
@@ -20,9 +20,14 @@ type EnvFunction = {
   (envVars: Array<string>): boolean;
 };
 
-type CallerFactory = (
-  extractor: (callerMetadata: CallerMetadata | undefined) => unknown,
-) => SimpleType;
+type CallerFactory = {
+  <T extends SimpleType>(
+    extractor: (callerMetadata: CallerMetadata | undefined) => T,
+  ): T;
+  (
+    extractor: (callerMetadata: CallerMetadata | undefined) => unknown,
+  ): SimpleType;
+};
 type TargetsFunction = () => Targets;
 type AssumptionFunction = (name: AssumptionName) => boolean | undefined;
 
@@ -67,9 +72,9 @@ export function makeConfigAPI<SideChannel extends Context.SimpleConfig>(
       });
     })) as any;
 
-  const caller = (cb: {
-    (CallerMetadata: CallerMetadata | undefined): SimpleType;
-  }) => cache.using(data => assertSimpleType(cb(data.caller)));
+  const caller = (
+    cb: (CallerMetadata: CallerMetadata | undefined) => SimpleType,
+  ) => cache.using(data => assertSimpleType(cb(data.caller)));
 
   return {
     version: coreVersion,
@@ -120,12 +125,11 @@ function assertVersion(range: string | number): void {
   if (typeof range !== "string") {
     throw new Error("Expected string or integer value.");
   }
-  // TODO(Babel 8): Update all the version checks
-  if (process.env.BABEL_8_BREAKING) {
-    range += ` || ^8.0.0-0`;
-  }
 
-  if (semver.satisfies(coreVersion, range)) return;
+  // We want "*" to also allow any pre-release, but we do not pass
+  // the includePrerelease option to semver.satisfies because we
+  // do not want ^7.0.0 to match 8.0.0-alpha.1.
+  if (range === "*" || semver.satisfies(coreVersion, range)) return;
 
   const limit = Error.stackTraceLimit;
 

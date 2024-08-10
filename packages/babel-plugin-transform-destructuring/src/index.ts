@@ -1,14 +1,13 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { types as t } from "@babel/core";
+import { types as t, type NodePath } from "@babel/core";
 import {
   DestructuringTransformer,
   convertVariableDeclaration,
   convertAssignmentExpression,
   unshiftForXStatementBody,
   type DestructuringTransformerNode,
-} from "./util";
-export { buildObjectExcludingKeys, unshiftForXStatementBody } from "./util";
-import type { NodePath } from "@babel/traverse";
+} from "./util.ts";
+export { buildObjectExcludingKeys, unshiftForXStatementBody } from "./util.ts";
 
 /**
  * Test if a VariableDeclaration's declarations contains any Patterns.
@@ -30,7 +29,7 @@ export interface Options {
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { useBuiltIns = false } = options;
 
@@ -80,7 +79,7 @@ export default declare((api, options: Options) => {
           ]);
 
           path.ensureBlock();
-          const statementBody = path.node.body.body;
+          const statementBody = (path.node.body as t.BlockStatement).body;
           const nodes = [];
           // todo: the completion of a for statement can only be observed from
           // a do block (or eval that we don't support),
@@ -158,7 +157,7 @@ export default declare((api, options: Options) => {
       AssignmentExpression(path, state) {
         if (!t.isPattern(path.node.left)) return;
         convertAssignmentExpression(
-          path,
+          path as NodePath<t.AssignmentExpression & { left: t.Pattern }>,
           name => state.addHelper(name),
           arrayLikeIsIterable,
           iterableIsArray,

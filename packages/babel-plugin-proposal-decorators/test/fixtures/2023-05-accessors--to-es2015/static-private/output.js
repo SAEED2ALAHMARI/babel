@@ -1,41 +1,15 @@
-var _init_a, _get_a, _set_a, _init_b, _get_b, _set_b, _initStatic, _class;
+var _Foo;
+let _initStatic, _init_a, _get_a, _set_a, _init_b, _get_b, _set_b;
 const dec = () => {};
-var _a = /*#__PURE__*/new WeakMap();
-var _b = /*#__PURE__*/new WeakMap();
-class Foo {
-  constructor() {
-    babelHelpers.classPrivateFieldInitSpec(this, _b, {
-      get: _get_b2,
-      set: _set_b2
-    });
-    babelHelpers.classPrivateFieldInitSpec(this, _a, {
-      get: _get_a2,
-      set: _set_a2
-    });
-  }
-}
-_class = Foo;
-function _set_a2(v) {
-  _set_a(this, v);
-}
-function _get_a2() {
-  return _get_a(this);
-}
-function _set_b2(v) {
-  _set_b(this, v);
-}
-function _get_b2() {
-  return _get_b(this);
-}
+class Foo {}
+_Foo = Foo;
 (() => {
-  [_init_a, _get_a, _set_a, _init_b, _get_b, _set_b, _initStatic] = babelHelpers.applyDecs2305(_class, [[dec, 9, "a", o => babelHelpers.classStaticPrivateFieldSpecGet(o, _class, _A), (o, v) => babelHelpers.classStaticPrivateFieldSpecSet(o, _class, _A, v)], [dec, 9, "b", o => babelHelpers.classStaticPrivateFieldSpecGet(o, _class, _B), (o, v) => babelHelpers.classStaticPrivateFieldSpecSet(o, _class, _B, v)]], []).e;
-  _initStatic(_class);
+  [_init_a, _get_a, _set_a, _init_b, _get_b, _set_b, _initStatic] = babelHelpers.applyDecs2305(_Foo, [[dec, 9, "a", o => babelHelpers.assertClassBrand(_Foo, o, _A)._, (o, v) => _A._ = babelHelpers.assertClassBrand(_Foo, o, v)], [dec, 9, "b", o => babelHelpers.assertClassBrand(_Foo, o, _B)._, (o, v) => _B._ = babelHelpers.assertClassBrand(_Foo, o, v)]], []).e;
+  _initStatic(_Foo);
 })();
 var _A = {
-  writable: true,
-  value: _init_a(_class)
+  _: _init_a(_Foo)
 };
 var _B = {
-  writable: true,
-  value: _init_b(_class, 123)
+  _: _init_b(_Foo, 123)
 };

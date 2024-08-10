@@ -22,7 +22,7 @@ import {
   updateExpression,
 } from "@babel/types";
 import type * as t from "@babel/types";
-import { willPathCastToBoolean } from "./util";
+import { willPathCastToBoolean } from "./util.ts";
 
 class AssignmentMemoiser {
   private _map: WeakMap<t.Expression, { count: number; value: t.Identifier }>;
@@ -169,12 +169,12 @@ const handle = {
       const willEndPathCastToBoolean = willPathCastToBoolean(endPath);
 
       const rootParentPath = endPath.parentPath;
-      if (
-        rootParentPath.isUpdateExpression({ argument: node }) ||
-        rootParentPath.isAssignmentExpression({ left: node })
-      ) {
-        throw member.buildCodeFrameError(`can't handle assignment`);
+      if (rootParentPath.isUpdateExpression({ argument: node })) {
+        throw member.buildCodeFrameError(`can't handle update expression`);
       }
+      const isAssignment = rootParentPath.isAssignmentExpression({
+        left: endPath.node,
+      });
       const isDeleteOperation = rootParentPath.isUnaryExpression({
         operator: "delete",
       });
@@ -215,12 +215,9 @@ const handle = {
         );
       }
 
-      // @ts-expect-error isOptionalMemberExpression does not work with NodePath union
       const startingNode = startingOptional.isOptionalMemberExpression()
-        ? // @ts-expect-error isOptionalMemberExpression does not work with NodePath union
-          startingOptional.node.object
-        : // @ts-expect-error isOptionalMemberExpression does not work with NodePath union
-          startingOptional.node.callee;
+        ? startingOptional.node.object
+        : startingOptional.node.callee;
       const baseNeedsMemoised = scope.maybeGenerateMemoised(startingNode);
       const baseRef = baseNeedsMemoised ?? startingNode;
 
@@ -252,6 +249,9 @@ const handle = {
         parentPath.isUnaryExpression({ operator: "delete" })
       ) {
         parentPath.replaceWith(this.delete(member));
+      } else if (parentPath.isAssignmentExpression()) {
+        // `a?.#b = c` to `(a == null ? void 0 : a.#b = c)`
+        handleAssignment(this, member, parentPath);
       } else {
         member.replaceWith(this.get(member));
       }
@@ -295,7 +295,7 @@ const handle = {
       }
 
       let replacementPath: NodePath = endPath;
-      if (isDeleteOperation) {
+      if (isDeleteOperation || isAssignment) {
         replacementPath = endParentPath;
         regular = endParentPath.node;
       }
@@ -432,44 +432,7 @@ const handle = {
     // MEMBER += VALUE   ->   _set(MEMBER, _get(MEMBER) + VALUE)
     // MEMBER ??= VALUE   ->   _get(MEMBER) ?? _set(MEMBER, VALUE)
     if (parentPath.isAssignmentExpression({ left: node })) {
-      if (this.simpleSet) {
-        member.replaceWith(this.simpleSet(member));
-        return;
-      }
-
-      const { operator, right: value } = parentPath.node;
-
-      if (operator === "=") {
-        parentPath.replaceWith(this.set(member, value));
-      } else {
-        const operatorTrunc = operator.slice(0, -1);
-        if (LOGICAL_OPERATORS.includes(operatorTrunc)) {
-          // Give the state handler a chance to memoise the member, since we'll
-          // reference it twice. The first access (the get) should do the memo
-          // assignment.
-          this.memoise(member, 1);
-          parentPath.replaceWith(
-            logicalExpression(
-              operatorTrunc as t.LogicalExpression["operator"],
-              this.get(member),
-              this.set(member, value),
-            ),
-          );
-        } else {
-          // Here, the second access (the set) is evaluated first.
-          this.memoise(member, 2);
-          parentPath.replaceWith(
-            this.set(
-              member,
-              binaryExpression(
-                operatorTrunc as t.BinaryExpression["operator"],
-                this.get(member),
-                value,
-              ),
-            ),
-          );
-        }
-      }
+      handleAssignment(this, member, parentPath);
       return;
     }
 
@@ -549,6 +512,51 @@ const handle = {
   },
 };
 
+function handleAssignment(
+  state: HandlerState,
+  member: NodePath<t.MemberExpression | t.OptionalMemberExpression>,
+  parentPath: NodePath<t.AssignmentExpression>,
+) {
+  if (state.simpleSet) {
+    member.replaceWith(state.simpleSet(member));
+    return;
+  }
+
+  const { operator, right: value } = parentPath.node;
+
+  if (operator === "=") {
+    parentPath.replaceWith(state.set(member, value));
+  } else {
+    const operatorTrunc = operator.slice(0, -1);
+    if (LOGICAL_OPERATORS.includes(operatorTrunc)) {
+      // Give the state handler a chance to memoise the member, since we'll
+      // reference it twice. The first access (the get) should do the memo
+      // assignment.
+      state.memoise(member, 1);
+      parentPath.replaceWith(
+        logicalExpression(
+          operatorTrunc as t.LogicalExpression["operator"],
+          state.get(member),
+          state.set(member, value),
+        ),
+      );
+    } else {
+      // Here, the second access (the set) is evaluated first.
+      state.memoise(member, 2);
+      parentPath.replaceWith(
+        state.set(
+          member,
+          binaryExpression(
+            operatorTrunc as t.BinaryExpression["operator"],
+            state.get(member),
+            value,
+          ),
+        ),
+      );
+    }
+  }
+}
+
 export interface Handler<State> {
   memoise?(
     this: HandlerState<State> & State,
@@ -580,7 +588,7 @@ export interface Handler<State> {
   delete(this: HandlerState<State> & State, member: Member): t.Expression;
 }
 
-export interface HandlerState<State = {}> extends Handler<State> {
+export interface HandlerState<State = object> extends Handler<State> {
   handle(
     this: HandlerState<State> & State,
     member: Member,
@@ -596,7 +604,7 @@ export interface HandlerState<State = {}> extends Handler<State> {
 // get, set, and call methods.
 // Optionally, a memoise method may be defined on the state, which will be
 // called when the member is a self-referential update.
-export default function memberExpressionToFunctions<CustomState = {}>(
+export default function memberExpressionToFunctions<CustomState extends object>(
   path: NodePath,
   visitor: Visitor<HandlerState<CustomState>>,
   state: Handler<CustomState> & CustomState,

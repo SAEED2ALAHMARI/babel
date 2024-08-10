@@ -1,6 +1,6 @@
-import { types as t, type PluginPass } from "@babel/core";
-import type { NodePath, Visitor } from "@babel/traverse";
-import buildOptimizedSequenceExpression from "./buildOptimizedSequenceExpression";
+import { types as t } from "@babel/core";
+import type { PluginPass, NodePath, Visitor } from "@babel/core";
+import buildOptimizedSequenceExpression from "./buildOptimizedSequenceExpression.ts";
 
 const minimalVisitor: Visitor<PluginPass> = {
   BinaryExpression(path) {

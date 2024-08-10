@@ -1,6 +1,6 @@
 {
   "name": "@babel/eslint-tests",
-  "version": "7.19.1",
+  "version": "7.24.7",
   "description": "Tests for babel/eslint-* packages",
   "private": true,
   "dependencies": {
@@ -12,5 +12,5 @@
     "eslint-plugin-import": "^2.25.4",
     "npm-babel-parser": "npm:@babel/parser@^7.14.0"
   },
-  "type": "commonjs"
+  "type": "module"
 }

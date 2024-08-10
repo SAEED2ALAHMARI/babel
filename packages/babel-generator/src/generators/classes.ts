@@ -1,9 +1,12 @@
-import type Printer from "../printer";
+import type Printer from "../printer.ts";
 import {
   isExportDefaultDeclaration,
   isExportNamedDeclaration,
 } from "@babel/types";
 import type * as t from "@babel/types";
+
+// We inline this package
+// eslint-disable-next-line import/no-extraneous-dependencies
 import * as charCodes from "charcodes";
 
 export function ClassDeclaration(
@@ -72,7 +75,9 @@ export function ClassBody(this: Printer, node: t.ClassBody) {
   } else {
     this.newline();
 
+    const exit = this.enterForStatementInit(false);
     this.printSequence(node.body, node, { indent: true });
+    exit();
 
     if (!this.endsWith(charCodes.lineFeed)) this.newline();
 

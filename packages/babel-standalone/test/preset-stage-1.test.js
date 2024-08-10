@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { itBabel7 } from "$repo-utils";
 const require = createRequire(import.meta.url);
 
 describe("stage-1 preset", () => {
@@ -29,7 +30,7 @@ describe("stage-1 preset", () => {
     expect(output).toMatchInlineSnapshot(`"x;"`);
   });
 
-  it("should support hack pipeline with `#` topic token", () => {
+  itBabel7("should support hack pipeline with `#` topic token", () => {
     const output = Babel.transform("x |> #", {
       presets: [
         [
@@ -45,10 +46,10 @@ describe("stage-1 preset", () => {
     }).code;
     expect(output).toMatchInlineSnapshot(`"x;"`);
   });
-  it("should support decorators versioned 2021-12", () => {
+  it("should support decorators versioned 2023-11", () => {
     const output = Babel.transform("@dec class C {}", {
       plugins: [["external-helpers", { helperVersion: "7.100.0" }]],
-      presets: [["stage-1", { decoratorsVersion: "2021-12" }]],
+      presets: [["stage-3", { decoratorsVersion: "2023-11" }]],
     }).code;
     expect(output).toMatch("babelHelpers.applyDecs");
   });
@@ -77,5 +78,14 @@ describe("stage-1 preset", () => {
       presets: [["stage-1", { decoratorsVersion: "2021-12" }]],
     }).code;
     expect(output).toMatchInlineSnapshot(`"Tuple(Record({}));"`);
+  });
+  it("should support optional chaining assignment", () => {
+    const output = Babel.transform("expr1?.prop = val", {
+      presets: [["stage-1", { decoratorsVersion: "2021-12" }]],
+    }).code;
+    expect(output).toMatchInlineSnapshot(`
+      "var _expr;
+      (_expr = expr1) === null || _expr === void 0 ? void 0 : _expr.prop = val;"
+    `);
   });
 });

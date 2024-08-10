@@ -1,16 +1,13 @@
-var _class;
+var _C;
 var _x = /*#__PURE__*/new WeakMap();
 class C {
   constructor() {
-    babelHelpers.classPrivateFieldInitSpec(this, _x, {
-      writable: true,
-      value: void 0
-    });
+    babelHelpers.classPrivateFieldInitSpec(this, _x, void 0);
   }
 }
-_class = C;
+_C = C;
 (() => {
-  for (_m = _class, x = babelHelpers.classPrivateFieldGet(_m, _x), _m;;) {
+  for (_m = _C, x = babelHelpers.classPrivateFieldGet2(_x, _m), _m;;) {
     var _m;
     break;
   }

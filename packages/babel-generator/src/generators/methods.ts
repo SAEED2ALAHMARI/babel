@@ -1,15 +1,14 @@
-import type Printer from "../printer";
+import type Printer from "../printer.ts";
 import type * as t from "@babel/types";
-import { isIdentifier } from "@babel/types";
-import type { NodePath } from "@babel/traverse";
+import { isIdentifier, type ParentMaps } from "@babel/types";
+
+type ParentsOf<T extends t.Node> = ParentMaps[T["type"]];
 
 export function _params(
   this: Printer,
   node: t.Function | t.TSDeclareMethod | t.TSDeclareFunction,
   idNode: t.Expression | t.PrivateName,
-  parentNode: NodePath<
-    t.Function | t.TSDeclareMethod | t.TSDeclareFunction
-  >["parent"],
+  parentNode: ParentsOf<typeof node>,
 ) {
   this.print(node.typeParameters, node);
 
@@ -39,6 +38,8 @@ export function _parameters(
     | t.TSFunctionType
     | t.TSConstructorType,
 ) {
+  const exit = this.enterForStatementInit(false);
+
   const paramLength = parameters.length;
   for (let i = 0; i < paramLength; i++) {
     this._param(parameters[i], parent);
@@ -48,6 +49,8 @@ export function _parameters(
       this.space();
     }
   }
+
+  exit();
 }
 
 export function _param(
@@ -144,9 +147,7 @@ export function _predicate(
 export function _functionHead(
   this: Printer,
   node: t.FunctionDeclaration | t.FunctionExpression | t.TSDeclareFunction,
-  parent: NodePath<
-    t.FunctionDeclaration | t.FunctionExpression | t.TSDeclareFunction
-  >["parent"],
+  parent: ParentsOf<typeof node>,
 ) {
   if (node.async) {
     this.word("async");
@@ -179,7 +180,7 @@ export function _functionHead(
 export function FunctionExpression(
   this: Printer,
   node: t.FunctionExpression,
-  parent: NodePath<t.FunctionExpression>["parent"],
+  parent: ParentsOf<typeof node>,
 ) {
   this._functionHead(node, parent);
   this.space();
@@ -191,7 +192,7 @@ export { FunctionExpression as FunctionDeclaration };
 export function ArrowFunctionExpression(
   this: Printer,
   node: t.ArrowFunctionExpression,
-  parent: NodePath<t.ArrowFunctionExpression>["parent"],
+  parent: ParentsOf<typeof node>,
 ) {
   if (node.async) {
     this.word("async", true);
@@ -244,9 +245,7 @@ function hasTypesOrComments(
 function _getFuncIdName(
   this: Printer,
   idNode: t.Expression | t.PrivateName,
-  parent: NodePath<
-    t.Function | t.TSDeclareMethod | t.TSDeclareFunction
-  >["parent"],
+  parent: ParentsOf<t.Function | t.TSDeclareMethod | t.TSDeclareFunction>,
 ) {
   let id: t.Expression | t.PrivateName | t.LVal = idNode;
 

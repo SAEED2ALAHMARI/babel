@@ -1,6 +1,6 @@
-import { finalize } from "./helpers/deep-array";
-import type { ReadonlyDeepArray } from "./helpers/deep-array";
-import type { PluginObject } from "./validation/plugins";
+import { finalize } from "./helpers/deep-array.ts";
+import type { ReadonlyDeepArray } from "./helpers/deep-array.ts";
+import type { PluginObject } from "./validation/plugins.ts";
 
 export default class Plugin {
   key: string | undefined | null;
@@ -12,13 +12,13 @@ export default class Plugin {
   parserOverride?: Function;
   generatorOverride?: Function;
 
-  options: {};
+  options: object;
 
   externalDependencies: ReadonlyDeepArray<string>;
 
   constructor(
     plugin: PluginObject,
-    options: {},
+    options: object,
     key?: string,
     externalDependencies: ReadonlyDeepArray<string> = finalize([]),
   ) {

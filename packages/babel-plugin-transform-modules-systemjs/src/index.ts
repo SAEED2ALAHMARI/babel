@@ -1,6 +1,7 @@
 import { declare } from "@babel/helper-plugin-utils";
 import hoistVariables from "@babel/helper-hoist-variables";
 import { template, types as t } from "@babel/core";
+import type { PluginPass, NodePath, Scope, Visitor } from "@babel/core";
 import {
   buildDynamicImport,
   getModuleName,
@@ -8,7 +9,6 @@ import {
 } from "@babel/helper-module-transforms";
 import type { PluginOptions } from "@babel/helper-module-transforms";
 import { isIdentifierName } from "@babel/helper-validator-identifier";
-import type { NodePath, Scope, Visitor } from "@babel/traverse";
 
 const buildTemplate = template.statement(`
   SYSTEM_REGISTER(MODULE_NAME, SOURCES, function (EXPORT_IDENTIFIER, CONTEXT_IDENTIFIER) {
@@ -176,7 +176,7 @@ type ReassignmentVisitorState = {
 };
 
 export default declare<PluginState>((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { systemGlobal = "System", allowTopLevelThis = false } = options;
   const reassignmentVisited = new WeakSet();
@@ -263,8 +263,14 @@ export default declare<PluginState>((api, options: Options) => {
     },
 
     visitor: {
-      CallExpression(path, state: PluginState) {
-        if (t.isImport(path.node.callee)) {
+      ["CallExpression" +
+        (api.types.importExpression ? "|ImportExpression" : "")](
+        this: PluginPass & PluginState,
+        path: NodePath<t.CallExpression | t.ImportExpression>,
+        state: PluginState,
+      ) {
+        if (path.isCallExpression() && !t.isImport(path.node.callee)) return;
+        if (path.isCallExpression()) {
           if (!this.file.has("@babel/plugin-proposal-dynamic-import")) {
             if (process.env.BABEL_8_BREAKING) {
               throw new Error(MISSING_PLUGIN_ERROR);
@@ -272,19 +278,23 @@ export default declare<PluginState>((api, options: Options) => {
               console.warn(MISSING_PLUGIN_WARNING);
             }
           }
-
-          path.replaceWith(
-            buildDynamicImport(path.node, false, true, specifier =>
-              t.callExpression(
-                t.memberExpression(
-                  t.identifier(state.contextIdent),
-                  t.identifier("import"),
-                ),
-                [specifier],
-              ),
-            ),
-          );
+        } else {
+          // when createImportExpressions is true, we require the dynamic import transform
+          if (!this.file.has("@babel/plugin-proposal-dynamic-import")) {
+            throw new Error(MISSING_PLUGIN_ERROR);
+          }
         }
+        path.replaceWith(
+          buildDynamicImport(path.node, false, true, specifier =>
+            t.callExpression(
+              t.memberExpression(
+                t.identifier(state.contextIdent),
+                t.identifier("import"),
+              ),
+              [specifier],
+            ),
+          ),
+        );
       },
 
       MetaProperty(path, state: PluginState) {
@@ -695,6 +705,7 @@ export default declare<PluginState>((api, options: Options) => {
               CONTEXT_IDENTIFIER: t.identifier(contextIdent),
             }),
           ];
+          path.requeue(path.get("body.0"));
         },
       },
     },

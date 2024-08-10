@@ -1,5 +1,4 @@
 const semver = require("semver");
-const shell = require("shelljs");
 
 const nodeVersion = process.versions.node;
 const supportsESMAndJestLightRunner = semver.satisfies(
@@ -9,11 +8,6 @@ const supportsESMAndJestLightRunner = semver.satisfies(
   "^12.22 || ^13.7 || >=14.17"
 );
 const isPublishBundle = process.env.IS_PUBLISH;
-
-if (!supportsESMAndJestLightRunner) {
-  //Avoid source maps from breaking stack tests.
-  shell.rm("-rf", "packages/babel-core/lib/**/*.js.map");
-}
 
 module.exports = {
   runner: supportsESMAndJestLightRunner ? "jest-light-runner" : "jest-runner",
@@ -36,6 +30,10 @@ module.exports = {
     "<rootDir>/packages/babel-helpers/.*/helpers/.*",
     "<rootDir>/packages/babel-core/.*/vendor/.*",
   ],
+
+  setupFiles: supportsESMAndJestLightRunner
+    ? ["@cspotcode/source-map-support/register"]
+    : [],
 
   // The eslint/* packages is tested against ESLint v8, which has dropped support for Node v10.
   // TODO: Remove this process.version check in Babel 8.
@@ -61,6 +59,14 @@ module.exports = {
     // Ignore @babel/standalone test in coverage testing because it is not built
     ...(process.env.BABEL_COVERAGE === "true"
       ? ["<rootDir>/packages/babel-standalone/"]
+      : []),
+    // Node.js 20.6.0 has a bug that causes importing all previous Babel
+    // versions to fail. This test relies on Babel 7.12, so let's skip it.
+    ...(process.version === "v20.6.0"
+      ? ["/babel-preset-env/test/regressions.js"]
+      : []),
+    ...(!semver.satisfies(nodeVersion, "^18.18.0 || >=20.0")
+      ? ["<rootDir>/eslint/"]
       : []),
   ],
   testEnvironment: "node",

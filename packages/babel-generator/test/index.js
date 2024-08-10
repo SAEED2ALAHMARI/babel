@@ -4,13 +4,13 @@ import fs from "fs";
 import path from "path";
 import fixtures from "@babel/helper-fixtures";
 import { TraceMap, originalPositionFor } from "@jridgewell/trace-mapping";
-import { commonJS } from "$repo-utils";
+import { commonJS, describeBabel7NoESM } from "$repo-utils";
 import { encode } from "@jridgewell/sourcemap-codec";
 
-import _generate, { CodeGenerator } from "../lib/index.js";
+import _generate from "../lib/index.js";
 const generate = _generate.default || _generate;
 
-const { __dirname } = commonJS(import.meta.url);
+const { __dirname, require } = commonJS(import.meta.url);
 
 describe("generation", function () {
   it("multiple sources", function () {
@@ -42,6 +42,7 @@ describe("generation", function () {
     expect(generated.map).toMatchInlineSnapshot(`
       Object {
         "file": undefined,
+        "ignoreList": Array [],
         "mappings": "AAAA,SAASA,EAAEA,CAAEC,GAAG,EAAE;EAAEC,OAAO,CAACC,GAAG,CAACF,GAAG,CAAC;AAAE;ACAtCD,EAAE,CAAC,OAAO,CAAC",
         "names": Array [
           "hi",
@@ -330,6 +331,7 @@ describe("generation", function () {
       Object {
         "__mergedMap": Object {
           "file": undefined,
+          "ignoreList": Array [],
           "mappings": "AAAA,SAASA,IAAGA,CAAA,EAAG;EAAEC,IAAG;AAAE",
           "names": Array [
             "foo",
@@ -350,6 +352,7 @@ describe("generation", function () {
       }",
         "decodedMap": Object {
           "file": undefined,
+          "ignoreList": Array [],
           "mappings": Array [
             Array [
               Array [
@@ -425,6 +428,7 @@ describe("generation", function () {
         },
         "map": Object {
           "file": undefined,
+          "ignoreList": Array [],
           "mappings": "AAAA,SAASA,IAAGA,CAAA,EAAG;EAAEC,IAAG;AAAE",
           "names": Array [
             "foo",
@@ -901,6 +905,7 @@ describe("generation", function () {
     ).toMatchInlineSnapshot(`
       Object {
         "file": undefined,
+        "ignoreList": Array [],
         "mappings": "AAAA,IAAIA,CAAC,GAAGC,CAAA,IAAAA,CAAA,GAAJA,CAAC",
         "names": Array [
           "t",
@@ -1465,28 +1470,122 @@ describe("programmatic generation", function () {
         line*/"
       `);
     });
+  });
 
-    it("comment in arrow function with return type", () => {
-      const arrow = t.arrowFunctionExpression(
-        [t.identifier("x"), t.identifier("y")],
-        t.identifier("z"),
-      );
-      arrow.returnType = t.tsTypeAnnotation(t.tsAnyKeyword());
-      arrow.returnType.trailingComments = [
-        { type: "CommentBlock", value: "foo" },
-        // This comment is dropped. There is no way to safely print it
-        // as a trailingComment of the return type.
-        { type: "CommentBlock", value: "new\nline" },
-      ];
-      expect(generate(arrow).code).toMatchInlineSnapshot(
-        `"(x, y): any /*foo*/ => z"`,
-      );
-    });
+  it("comment in arrow function with return type", () => {
+    const arrow = t.arrowFunctionExpression(
+      [t.identifier("x"), t.identifier("y")],
+      t.identifier("z"),
+    );
+    arrow.returnType = t.tsTypeAnnotation(t.tsAnyKeyword());
+    arrow.returnType.trailingComments = [
+      { type: "CommentBlock", value: "foo" },
+      // This comment is dropped. There is no way to safely print it
+      // as a trailingComment of the return type.
+      { type: "CommentBlock", value: "new\nline" },
+    ];
+    expect(generate(arrow).code).toMatchInlineSnapshot(
+      `"(x, y): any /*foo*/ => z"`,
+    );
+  });
+
+  it("multi-line leading comment after return", () => {
+    const val = t.identifier("val");
+    val.leadingComments = [{ type: "CommentBlock", value: "new\nline" }];
+    expect(generate(t.returnStatement(val)).code).toMatch(`return (
+  /*new
+  line*/
+  val
+);`);
+  });
+
+  it("multi-line leading comment after return 2", () => {
+    const ast = parse(
+      `return (
+        /*new
+        line*/ val);`,
+      {
+        allowReturnOutsideFunction: true,
+      },
+    );
+    // Remove `parenthesized`
+    ast.program.body[0].argument.extra = null;
+    expect(generate(ast).code).toMatchInlineSnapshot(`
+        "return (
+          /*new
+          line*/
+          val
+        );"
+      `);
+  });
+
+  it("multi-line leading comment after return compact", () => {
+    const val = t.identifier("val");
+    val.leadingComments = [{ type: "CommentBlock", value: "new\nline" }];
+    expect(
+      generate(t.returnStatement(val), {
+        compact: true,
+      }).code,
+    ).toMatchInlineSnapshot(`
+        "return(/*new
+        line*/val);"
+      `);
+  });
+
+  it("multi-line leading comment after return concise", () => {
+    const val = t.identifier("val");
+    val.leadingComments = [{ type: "CommentBlock", value: "new\nline" }];
+    expect(
+      generate(t.returnStatement(val), {
+        concise: true,
+      }).code,
+    ).toMatchInlineSnapshot(`
+        "return (/*new
+        line*/ val );"
+      `);
+  });
+
+  it("correctly indenting when `retainLines`", () => {
+    const ast = parse(
+      `
+export const App = () => {
+  return (
+      /**
+        * First
+        */
+      2
+  );
+};
+
+/**
+  * Second
+  */`,
+      {
+        sourceType: "module",
+      },
+    );
+
+    expect(generate(ast, { retainLines: true }).code).toMatchInlineSnapshot(`
+      "
+      export const App = () => {
+        return (
+          /**
+            * First
+            */
+          2);
+
+      };
+
+      /**
+        * Second
+        */"
+    `);
   });
 });
 
-describe("CodeGenerator", function () {
+describeBabel7NoESM("CodeGenerator", function () {
   it("generate", function () {
+    const CodeGenerator = require("../lib/index.js").CodeGenerator;
     const codeGen = new CodeGenerator(t.numericLiteral(123));
     const code = codeGen.generate().code;
     expect(parse(code).program.body[0].expression.value).toBe(123);

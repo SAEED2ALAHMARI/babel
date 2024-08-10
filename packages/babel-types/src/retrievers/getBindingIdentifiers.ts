@@ -1,12 +1,16 @@
 import {
   isExportDeclaration,
   isIdentifier,
+  isClassExpression,
   isDeclaration,
   isFunctionDeclaration,
   isFunctionExpression,
   isExportAllDeclaration,
-} from "../validators/generated";
-import type * as t from "..";
+  isAssignmentExpression,
+  isUnaryExpression,
+  isUpdateExpression,
+} from "../validators/generated/index.ts";
+import type * as t from "../index.ts";
 
 export { getBindingIdentifiers as default };
 
@@ -14,18 +18,21 @@ function getBindingIdentifiers(
   node: t.Node,
   duplicates: true,
   outerOnly?: boolean,
+  newBindingsOnly?: boolean,
 ): Record<string, Array<t.Identifier>>;
 
 function getBindingIdentifiers(
   node: t.Node,
   duplicates?: false,
   outerOnly?: boolean,
+  newBindingsOnly?: boolean,
 ): Record<string, t.Identifier>;
 
 function getBindingIdentifiers(
   node: t.Node,
   duplicates?: boolean,
   outerOnly?: boolean,
+  newBindingsOnly?: boolean,
 ): Record<string, t.Identifier> | Record<string, Array<t.Identifier>>;
 
 /**
@@ -35,6 +42,7 @@ function getBindingIdentifiers(
   node: t.Node,
   duplicates?: boolean,
   outerOnly?: boolean,
+  newBindingsOnly?: boolean,
 ): Record<string, t.Identifier> | Record<string, Array<t.Identifier>> {
   const search: t.Node[] = [].concat(node);
   const ids = Object.create(null);
@@ -43,9 +51,19 @@ function getBindingIdentifiers(
     const id = search.shift();
     if (!id) continue;
 
-    const keys =
-      // @ts-expect-error getBindingIdentifiers.keys do not cover all AST types
-      getBindingIdentifiers.keys[id.type];
+    if (
+      newBindingsOnly &&
+      // These nodes do not introduce _new_ bindings, but they are included
+      // in getBindingIdentifiers.keys for backwards compatibility.
+      // TODO(@nicolo-ribaudo): Check if we can remove them from .keys in a
+      // backward-compatible way, and if not what we need to do to remove them
+      // in Babel 8.
+      (isAssignmentExpression(id) ||
+        isUnaryExpression(id) ||
+        isUpdateExpression(id))
+    ) {
+      continue;
+    }
 
     if (isIdentifier(id)) {
       if (duplicates) {
@@ -70,10 +88,15 @@ function getBindingIdentifiers(
         continue;
       }
 
-      if (isFunctionExpression(id)) {
+      if (
+        isFunctionExpression(id) ||
+        (process.env.BABEL_8_BREAKING && isClassExpression(id))
+      ) {
         continue;
       }
     }
+
+    const keys = getBindingIdentifiers.keys[id.type];
 
     if (keys) {
       for (let i = 0; i < keys.length; i++) {
@@ -82,20 +105,26 @@ function getBindingIdentifiers(
           // @ts-expect-error key must present in id
           id[key] as t.Node[] | t.Node | undefined | null;
         if (nodes) {
-          Array.isArray(nodes) ? search.push(...nodes) : search.push(nodes);
+          if (Array.isArray(nodes)) {
+            search.push(...nodes);
+          } else {
+            search.push(nodes);
+          }
         }
       }
     }
   }
-
-  // $FlowIssue Object.create() seems broken
   return ids;
 }
 
 /**
  * Mapping of types to their identifier keys.
  */
-getBindingIdentifiers.keys = {
+type KeysMap = {
+  [N in t.Node as N["type"]]?: (keyof N)[];
+};
+
+const keys: KeysMap = {
   DeclareClass: ["id"],
   DeclareFunction: ["id"],
   DeclareModule: ["id"],
@@ -146,3 +175,5 @@ getBindingIdentifiers.keys = {
   VariableDeclaration: ["declarations"],
   VariableDeclarator: ["id"],
 };
+
+getBindingIdentifiers.keys = keys;

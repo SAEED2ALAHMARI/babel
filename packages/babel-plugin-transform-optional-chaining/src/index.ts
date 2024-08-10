@@ -1,13 +1,12 @@
 import { declare } from "@babel/helper-plugin-utils";
-import { transform } from "./transform";
-import type { NodePath } from "@babel/traverse";
-import type * as t from "@babel/types";
+import { transform, transformOptionalChain } from "./transform.ts";
+import type { NodePath, types as t } from "@babel/core";
 
 export interface Options {
   loose?: boolean;
 }
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const { loose = false } = options;
   const noDocumentAll = api.assumption("noDocumentAll") ?? loose;
@@ -15,12 +14,11 @@ export default declare((api, options: Options) => {
 
   return {
     name: "transform-optional-chaining",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-optional-chaining").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-optional-chaining").default,
 
     visitor: {
       "OptionalCallExpression|OptionalMemberExpression"(
@@ -32,4 +30,4 @@ export default declare((api, options: Options) => {
   };
 });
 
-export { transform };
+export { transform, transformOptionalChain };

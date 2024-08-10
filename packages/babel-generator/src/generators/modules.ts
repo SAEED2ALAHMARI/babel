@@ -1,4 +1,4 @@
-import type Printer from "../printer";
+import type Printer from "../printer.ts";
 import {
   isClassDeclaration,
   isExportDefaultSpecifier,
@@ -248,6 +248,10 @@ export function ImportDeclaration(this: Printer, node: t.ImportDeclaration) {
     this.noIndentInnerCommentsHere();
     this.word("module");
     this.space();
+  } else if (node.phase) {
+    this.noIndentInnerCommentsHere();
+    this.word(node.phase);
+    this.space();
   }
 
   const specifiers = node.specifiers.slice(0);
@@ -311,4 +315,20 @@ export function ImportNamespaceSpecifier(
   this.word("as");
   this.space();
   this.print(node.local, node);
+}
+
+export function ImportExpression(this: Printer, node: t.ImportExpression) {
+  this.word("import");
+  if (node.phase) {
+    this.token(".");
+    this.word(node.phase);
+  }
+  this.token("(");
+  this.print(node.source, node);
+  if (node.options != null) {
+    this.token(",");
+    this.space();
+    this.print(node.options, node);
+  }
+  this.token(")");
 }

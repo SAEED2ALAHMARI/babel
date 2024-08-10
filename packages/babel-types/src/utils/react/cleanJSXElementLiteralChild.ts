@@ -1,6 +1,6 @@
-import { stringLiteral } from "../../builders/generated";
-import type * as t from "../..";
-import { inherits } from "../..";
+import { stringLiteral } from "../../builders/generated/index.ts";
+import type * as t from "../../index.ts";
+import { inherits } from "../../index.ts";
 
 export default function cleanJSXElementLiteralChild(
   child: t.JSXText,
@@ -11,7 +11,7 @@ export default function cleanJSXElementLiteralChild(
   let lastNonEmptyLine = 0;
 
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].match(/[^ \t]/)) {
+    if (/[^ \t]/.exec(lines[i])) {
       lastNonEmptyLine = i;
     }
   }

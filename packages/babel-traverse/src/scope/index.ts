@@ -1,9 +1,9 @@
-import Renamer from "./lib/renamer";
-import type NodePath from "../path";
-import traverse from "../index";
-import type { TraverseOptions } from "../index";
-import Binding from "./binding";
-import type { BindingKind } from "./binding";
+import Renamer from "./lib/renamer.ts";
+import type NodePath from "../path/index.ts";
+import traverse from "../index.ts";
+import type { TraverseOptions } from "../index.ts";
+import Binding from "./binding.ts";
+import type { BindingKind } from "./binding.ts";
 import globals from "globals";
 import {
   NOT_LOCAL_BINDING,
@@ -13,6 +13,7 @@ import {
   identifier,
   isArrayExpression,
   isBinary,
+  isCallExpression,
   isClass,
   isClassBody,
   isClassDeclaration,
@@ -23,6 +24,7 @@ import {
   isIdentifier,
   isImportDeclaration,
   isLiteral,
+  isMemberExpression,
   isMethod,
   isModuleSpecifier,
   isNullLiteral,
@@ -40,7 +42,6 @@ import {
   memberExpression,
   numericLiteral,
   toIdentifier,
-  unaryExpression,
   variableDeclaration,
   variableDeclarator,
   isRecordExpression,
@@ -50,11 +51,12 @@ import {
   isMetaProperty,
   isPrivateName,
   isExportDeclaration,
+  buildUndefinedNode,
 } from "@babel/types";
 import * as t from "@babel/types";
-import { scope as scopeCache } from "../cache";
-import type { Visitor } from "../types";
-import { isExplodedVisitor } from "../visitors";
+import { scope as scopeCache } from "../cache.ts";
+import type { Visitor } from "../types.ts";
+import { isExplodedVisitor } from "../visitors.ts";
 
 type NodePart = string | number | boolean;
 // Recursively gathers the identifying names of a node.
@@ -367,8 +369,11 @@ const collectorVisitor: Visitor<CollectVisitorState> = {
       // @ts-expect-error Fixme: document symbol ast properties
       !path.get("id").node[NOT_LOCAL_BINDING]
     ) {
-      path.scope.registerBinding("local", path);
+      path.scope.registerBinding("local", path.get("id"), path);
     }
+  },
+  TSTypeAnnotation(path) {
+    path.skip();
   },
 };
 
@@ -376,7 +381,8 @@ let uid = 0;
 
 export type { Binding };
 
-export default class Scope {
+export { Scope as default };
+class Scope {
   uid;
 
   path: NodePath;
@@ -435,7 +441,7 @@ export default class Scope {
       const shouldSkip = path.key === "key" || path.listKey === "decorators";
       path = path.parentPath;
       if (shouldSkip && path.isMethod()) path = path.parentPath;
-      if (path && path.isScope()) parent = path;
+      if (path?.isScope()) parent = path;
     } while (path && !parent);
 
     return parent?.scope;
@@ -783,7 +789,7 @@ export default class Scope {
   }
 
   buildUndefinedNode() {
-    return unaryExpression("void", numericLiteral(0), true);
+    return buildUndefinedNode();
   }
 
   registerConstantViolation(path: NodePath) {
@@ -827,7 +833,7 @@ export default class Scope {
 
         // A redeclaration of an existing variable is a modification
         if (local) {
-          this.registerConstantViolation(bindingPath);
+          local.reassign(bindingPath);
         } else {
           this.bindings[name] = new Binding({
             identifier: id,
@@ -929,17 +935,33 @@ export default class Scope {
       return true;
     } else if (isUnaryExpression(node)) {
       return this.isPure(node.argument, constantsOnly);
-    } else if (isTaggedTemplateExpression(node)) {
-      return (
-        matchesPattern(node.tag, "String.raw") &&
-        !this.hasBinding("String", true) &&
-        this.isPure(node.quasi, constantsOnly)
-      );
     } else if (isTemplateLiteral(node)) {
       for (const expression of node.expressions) {
         if (!this.isPure(expression, constantsOnly)) return false;
       }
       return true;
+    } else if (isTaggedTemplateExpression(node)) {
+      return (
+        matchesPattern(node.tag, "String.raw") &&
+        !this.hasBinding("String", { noGlobals: true }) &&
+        this.isPure(node.quasi, constantsOnly)
+      );
+    } else if (isMemberExpression(node)) {
+      return (
+        !node.computed &&
+        isIdentifier(node.object) &&
+        node.object.name === "Symbol" &&
+        isIdentifier(node.property) &&
+        node.property.name !== "for" &&
+        !this.hasBinding("Symbol", { noGlobals: true })
+      );
+    } else if (isCallExpression(node)) {
+      return (
+        matchesPattern(node.callee, "Symbol.for") &&
+        !this.hasBinding("Symbol", { noGlobals: true }) &&
+        node.arguments.length === 1 &&
+        t.isStringLiteral(node.arguments[0])
+      );
     } else {
       return isPureish(node);
     }
@@ -1081,9 +1103,9 @@ export default class Scope {
       path.isFunction() &&
       // @ts-expect-error ArrowFunctionExpression never has a name
       !path.node.name &&
-      t.isCallExpression(path.parent, { callee: path.node }) &&
+      isCallExpression(path.parent, { callee: path.node }) &&
       path.parent.arguments.length <= path.node.params.length &&
-      t.isIdentifier(id)
+      isIdentifier(id)
     ) {
       path.pushContainer("params", id);
       path.scope.registerBinding(
@@ -1094,9 +1116,7 @@ export default class Scope {
     }
 
     if (path.isLoop() || path.isCatchClause() || path.isFunction()) {
-      // @ts-expect-error TS can not infer NodePath<Loop> | NodePath<CatchClause> as NodePath<Loop | CatchClause>
       path.ensureBlock();
-      // @ts-expect-error todo(flow->ts): improve types
       path = path.get("body");
     }
 
@@ -1296,15 +1316,26 @@ export default class Scope {
     opts?: boolean | { noGlobals?: boolean; noUids?: boolean },
   ) {
     if (!name) return false;
-    if (this.hasOwnBinding(name)) return true;
-    {
-      // TODO: Only accept the object form.
-      if (typeof opts === "boolean") opts = { noGlobals: opts };
+    let scope: Scope = this;
+    do {
+      if (scope.hasOwnBinding(name)) {
+        return true;
+      }
+    } while ((scope = scope.parent));
+
+    // TODO: Only accept the object form.
+    let noGlobals;
+    let noUids;
+    if (typeof opts === "object") {
+      noGlobals = opts.noGlobals;
+      noUids = opts.noUids;
+    } else if (typeof opts === "boolean") {
+      noGlobals = opts;
     }
-    if (this.parentHasBinding(name, opts)) return true;
-    if (!opts?.noUids && this.hasUid(name)) return true;
-    if (!opts?.noGlobals && Scope.globals.includes(name)) return true;
-    if (!opts?.noGlobals && Scope.contextVariables.includes(name)) return true;
+
+    if (!noUids && this.hasUid(name)) return true;
+    if (!noGlobals && Scope.globals.includes(name)) return true;
+    if (!noGlobals && Scope.contextVariables.includes(name)) return true;
     return false;
   }
 
@@ -1344,4 +1375,10 @@ export default class Scope {
       }
     } while ((scope = scope.parent));
   }
+}
+
+type _Binding = Binding;
+// eslint-disable-next-line @typescript-eslint/no-namespace
+namespace Scope {
+  export type Binding = _Binding;
 }

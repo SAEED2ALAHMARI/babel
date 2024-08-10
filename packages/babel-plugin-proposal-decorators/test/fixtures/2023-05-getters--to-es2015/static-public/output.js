@@ -1,17 +1,17 @@
-var _computedKey, _initStatic, _class;
+var _Foo;
+let _initStatic;
 const dec = () => {};
-_computedKey = 'b';
 class Foo {
   static get a() {
     return this.value;
   }
-  static get [_computedKey]() {
+  static get ['b']() {
     return this.value;
   }
 }
-_class = Foo;
+_Foo = Foo;
 (() => {
-  [_initStatic] = babelHelpers.applyDecs2305(_class, [[dec, 11, "a"], [dec, 11, _computedKey]], []).e;
-  _initStatic(_class);
+  [_initStatic] = babelHelpers.applyDecs2305(_Foo, [[dec, 11, "a"], [dec, 11, 'b']], []).e;
+  _initStatic(_Foo);
 })();
 babelHelpers.defineProperty(Foo, "value", 1);

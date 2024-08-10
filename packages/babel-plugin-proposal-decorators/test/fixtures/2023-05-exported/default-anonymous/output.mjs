@@ -1,9 +1,9 @@
-var _initClass, _dec;
+let _initClass, _classDecs;
+_classDecs = [dec];
 let _A;
-_dec = dec;
 class A {
   static {
-    [_A, _initClass] = babelHelpers.applyDecs2305(this, [], [_dec]).c;
+    [_A, _initClass] = babelHelpers.applyDecs2305(this, [], _classDecs).c;
   }
   static {
     _initClass();

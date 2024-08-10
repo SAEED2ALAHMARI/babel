@@ -1,7 +1,7 @@
 import * as babel from "../lib/index.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { USE_ESM } from "$repo-utils";
+import { itBabel7, itBabel7NoESM } from "$repo-utils";
 
 const cwd = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,11 +13,8 @@ function loadOptionsAsync(opts) {
   return babel.loadOptionsAsync({ cwd, ...opts });
 }
 
-const itBabel7 = process.env.BABEL_8_BREAKING ? it.skip : it;
-const itBabel7cjs = process.env.BABEL_8_BREAKING || USE_ESM ? it.skip : it;
-
 describe("option-manager", () => {
-  itBabel7cjs("throws for babel 5 plugin", () => {
+  itBabel7NoESM("throws for babel 5 plugin", () => {
     return expect(() => {
       loadOptions({
         plugins: [({ Plugin }) => new Plugin("object-assign", {})],
@@ -220,7 +217,6 @@ describe("option-manager", () => {
           blacklist: true,
         });
       }).toThrow(
-        // eslint-disable-next-line max-len
         /Using removed Babel 5 option: .auxiliaryComment - Use `auxiliaryCommentBefore` or `auxiliaryCommentAfter`/,
       );
     });

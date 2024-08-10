@@ -1,6 +1,6 @@
 import { declare } from "@babel/helper-plugin-utils";
-import convertFunctionParams from "./params";
-import convertFunctionRest from "./rest";
+import convertFunctionParams from "./params.ts";
+import convertFunctionRest from "./rest.ts";
 export { convertFunctionParams };
 
 export interface Options {
@@ -8,7 +8,7 @@ export interface Options {
 }
 
 export default declare((api, options: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
 
   const ignoreFunctionLength =
     api.assumption("ignoreFunctionLength") ?? options.loose;

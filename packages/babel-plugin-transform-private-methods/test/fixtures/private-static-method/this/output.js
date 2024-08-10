@@ -1,4 +1,4 @@
-var _class;
+var _B;
 class A {
   static get a() {
     return 1;
@@ -9,12 +9,12 @@ class B extends A {
     return 2;
   }
   static extract() {
-    return [babelHelpers.classStaticPrivateMethodGet(this, B, _getA), babelHelpers.classStaticPrivateMethodGet(this, B, _getB)];
+    return [babelHelpers.assertClassBrand(B, this, _getA), babelHelpers.assertClassBrand(B, this, _getB)];
   }
 }
-_class = B;
+_B = B;
 function _getA() {
-  return babelHelpers.get(babelHelpers.getPrototypeOf(_class), "a", this);
+  return babelHelpers.get(babelHelpers.getPrototypeOf(_B), "a", this);
 }
 function _getB() {
   return this.b;

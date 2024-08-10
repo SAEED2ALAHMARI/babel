@@ -9,8 +9,8 @@ type Opts<Obj> = Partial<{
   [Prop in keyof Obj]: Obj[Prop] extends t.Node
     ? t.Node
     : Obj[Prop] extends t.Node[]
-    ? t.Node[]
-    : Obj[Prop];
+      ? t.Node[]
+      : Obj[Prop];
 }>;
 
 export interface NodePathAssertions {
@@ -307,6 +307,9 @@ export interface NodePathAssertions {
   assertImportDefaultSpecifier(
     opts?: Opts<t.ImportDefaultSpecifier>,
   ): asserts this is NodePath<t.ImportDefaultSpecifier>;
+  assertImportExpression(
+    opts?: Opts<t.ImportExpression>,
+  ): asserts this is NodePath<t.ImportExpression>;
   assertImportNamespaceSpecifier(
     opts?: Opts<t.ImportNamespaceSpecifier>,
   ): asserts this is NodePath<t.ImportNamespaceSpecifier>;

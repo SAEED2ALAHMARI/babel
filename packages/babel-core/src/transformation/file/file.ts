@@ -5,12 +5,14 @@ import { codeFrameColumns } from "@babel/code-frame";
 import traverse from "@babel/traverse";
 import { cloneNode, interpreterDirective } from "@babel/types";
 import type * as t from "@babel/types";
-import { getModuleName } from "@babel/helper-module-transforms";
 import semver from "semver";
 
-import type { NormalizedFile } from "../normalize-file";
+import type { NormalizedFile } from "../normalize-file.ts";
 
-const errorVisitor: Visitor<{ loc: NodeLocation["loc"] | null }> = {
+// @ts-expect-error This file is `any`
+import * as babel7 from "./babel-7-helpers.cjs";
+
+const errorVisitor: Visitor<{ loc: t.SourceLocation | null }> = {
   enter(path, state) {
     const loc = path.node.loc;
     if (loc) {
@@ -18,29 +20,6 @@ const errorVisitor: Visitor<{ loc: NodeLocation["loc"] | null }> = {
       path.stop();
     }
   },
-};
-
-export type NodeLocation = {
-  loc?: {
-    end?: {
-      line: number;
-      column: number;
-    };
-    start: {
-      line: number;
-      column: number;
-    };
-  };
-  _loc?: {
-    end?: {
-      line: number;
-      column: number;
-    };
-    start: {
-      line: number;
-      column: number;
-    };
-  };
 };
 
 export default class File {
@@ -63,7 +42,7 @@ export default class File {
     buildError: this.buildCodeFrameError.bind(this),
   };
 
-  constructor(options: {}, { code, ast, inputMap }: NormalizedFile) {
+  constructor(options: any, { code, ast, inputMap }: NormalizedFile) {
     this.opts = options;
     this.code = code;
     this.ast = ast;
@@ -97,14 +76,16 @@ export default class File {
   }
 
   set(key: unknown, val: unknown) {
-    if (key === "helpersNamespace") {
-      throw new Error(
-        "Babel 7.0.0-beta.56 has dropped support for the 'helpersNamespace' utility." +
-          "If you are using @babel/plugin-external-helpers you will need to use a newer " +
-          "version than the one you currently have installed. " +
-          "If you have your own implementation, you'll want to explore using 'helperGenerator' " +
-          "alongside 'file.availableHelper()'.",
-      );
+    if (!process.env.BABEL_8_BREAKING) {
+      if (key === "helpersNamespace") {
+        throw new Error(
+          "Babel 7.0.0-beta.56 has dropped support for the 'helpersNamespace' utility." +
+            "If you are using @babel/plugin-external-helpers you will need to use a newer " +
+            "version than the one you currently have installed. " +
+            "If you have your own implementation, you'll want to explore using 'helperGenerator' " +
+            "alongside 'file.availableHelper()'.",
+        );
+      }
     }
 
     this._map.set(key, val);
@@ -116,19 +97,6 @@ export default class File {
 
   has(key: unknown): boolean {
     return this._map.has(key);
-  }
-
-  getModuleName(): string | undefined | null {
-    return getModuleName(this.opts, this.opts);
-  }
-
-  addImport() {
-    throw new Error(
-      "This API has been removed. If you're looking for this " +
-        "functionality in Babel 7, you should import the " +
-        "'@babel/helper-module-imports' module and use the functions exposed " +
-        " from that module, such as 'addNamed' or 'addDefault'.",
-    );
   }
 
   /**
@@ -169,10 +137,17 @@ export default class File {
     // transform-runtime's definitions.js file.
     if (semver.valid(versionRange)) versionRange = `^${versionRange}`;
 
-    return (
-      !semver.intersects(`<${minVersion}`, versionRange) &&
-      !semver.intersects(`>=8.0.0`, versionRange)
-    );
+    if (process.env.BABEL_8_BREAKING) {
+      return (
+        !semver.intersects(`<${minVersion}`, versionRange) &&
+        !semver.intersects(`>=9.0.0`, versionRange)
+      );
+    } else {
+      return (
+        !semver.intersects(`<${minVersion}`, versionRange) &&
+        !semver.intersects(`>=8.0.0`, versionRange)
+      );
+    }
   }
 
   addHelper(name: string): t.Identifier {
@@ -186,7 +161,7 @@ export default class File {
     }
 
     // make sure that the helper exists
-    helpers.ensure(name, File);
+    helpers.minVersion(name);
 
     const uid = (this.declarations[name] =
       this.scope.generateUidIdentifier(name));
@@ -199,7 +174,7 @@ export default class File {
     const { nodes, globals } = helpers.get(
       name,
       dep => dependencies[dep],
-      uid,
+      uid.name,
       Object.keys(this.scope.getAllBindings()),
     );
 
@@ -214,35 +189,28 @@ export default class File {
       node._compact = true;
     });
 
-    this.path.unshiftContainer("body", nodes);
+    const added = this.path.unshiftContainer("body", nodes);
     // TODO: NodePath#unshiftContainer should automatically register new
     // bindings.
-    this.path.get("body").forEach(path => {
-      if (nodes.indexOf(path.node) === -1) return;
+    for (const path of added) {
       if (path.isVariableDeclaration()) this.scope.registerDeclaration(path);
-    });
+    }
 
     return uid;
   }
 
-  addTemplateObject() {
-    throw new Error(
-      "This function has been moved into the template literal transform itself.",
-    );
-  }
-
   buildCodeFrameError(
-    node: NodeLocation | undefined | null,
+    node: t.Node | undefined | null,
     msg: string,
     _Error: typeof Error = SyntaxError,
   ): Error {
-    let loc = node && (node.loc || node._loc);
+    let loc = node?.loc;
 
     if (!loc && node) {
-      const state: { loc?: NodeLocation["loc"] | null } = {
+      const state: { loc?: t.SourceLocation | null } = {
         loc: null,
       };
-      traverse(node as t.Node, errorVisitor, this.scope, state);
+      traverse(node, errorVisitor, this.scope, state);
       loc = state.loc;
 
       let txt =
@@ -277,5 +245,30 @@ export default class File {
     }
 
     return new _Error(msg);
+  }
+}
+
+if (!process.env.BABEL_8_BREAKING) {
+  // @ts-expect-error Babel 7
+  File.prototype.addImport = function addImport() {
+    throw new Error(
+      "This API has been removed. If you're looking for this " +
+        "functionality in Babel 7, you should import the " +
+        "'@babel/helper-module-imports' module and use the functions exposed " +
+        " from that module, such as 'addNamed' or 'addDefault'.",
+    );
+  };
+  // @ts-expect-error Babel 7
+  File.prototype.addTemplateObject = function addTemplateObject() {
+    throw new Error(
+      "This function has been moved into the template literal transform itself.",
+    );
+  };
+
+  if (!USE_ESM || IS_STANDALONE) {
+    // @ts-expect-error Babel 7
+    File.prototype.getModuleName = function getModuleName() {
+      return babel7.getModuleName()(this.opts, this.opts);
+    };
   }
 }

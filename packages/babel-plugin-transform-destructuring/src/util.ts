@@ -1,7 +1,5 @@
 import { types as t } from "@babel/core";
-import type { File } from "@babel/core";
-import type { Scope, NodePath } from "@babel/traverse";
-import type { TraversalAncestors } from "@babel/types";
+import type { File, Scope, NodePath } from "@babel/core";
 
 function isPureVoid(node: t.Node) {
   return (
@@ -27,7 +25,7 @@ export function unshiftForXStatementBody(
     // var a = 0;for (const { #x: x, [a++]: y } of z) { const a = 1; }
     node.body = t.blockStatement([...newStatements, node.body]);
   } else {
-    node.body.body.unshift(...newStatements);
+    (node.body as t.BlockStatement).body.unshift(...newStatements);
   }
 }
 
@@ -61,7 +59,7 @@ interface ArrayUnpackVisitorState {
 // NOTE: This visitor is meant to be used via t.traverse
 const arrayUnpackVisitor = (
   node: t.Node,
-  ancestors: TraversalAncestors,
+  ancestors: t.TraversalAncestors,
   state: ArrayUnpackVisitorState,
 ) => {
   if (!ancestors.length) {
@@ -75,6 +73,7 @@ const arrayUnpackVisitor = (
     state.bindings[node.name]
   ) {
     state.deopt = true;
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
     throw STOP_TRAVERSAL;
   }
 };
@@ -133,7 +132,7 @@ export class DestructuringTransformer {
     init: t.Expression,
   ) {
     let op = this.operator;
-    if (t.isMemberExpression(id)) op = "=";
+    if (t.isMemberExpression(id) || t.isOptionalMemberExpression(id)) op = "=";
 
     let node: t.ExpressionStatement | t.VariableDeclaration;
 
@@ -155,7 +154,7 @@ export class DestructuringTransformer {
       }
 
       node = t.variableDeclaration(this.kind, [
-        t.variableDeclarator(id, nodeInit),
+        t.variableDeclarator(id as t.LVal, nodeInit),
       ]);
     }
 
@@ -703,7 +702,7 @@ export function convertVariableDeclaration(
 }
 
 export function convertAssignmentExpression(
-  path: NodePath<t.AssignmentExpression>,
+  path: NodePath<t.AssignmentExpression & { left: t.Pattern }>,
   addHelper: File["addHelper"],
   arrayLikeIsIterable: boolean,
   iterableIsArray: boolean,

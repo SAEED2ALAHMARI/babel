@@ -1,4 +1,5 @@
-import toNodeDescription from "./to-node-description";
+import type { ParseErrorTemplates } from "../parse-error.ts";
+import toNodeDescription from "./to-node-description.ts";
 
 export const UnparenthesizedPipeBodyDescriptions = new Set([
   "ArrowFunctionExpression",
@@ -7,11 +8,10 @@ export const UnparenthesizedPipeBodyDescriptions = new Set([
   "YieldExpression",
 ] as const);
 
-type GetSetMemberType<T extends Set<any>> = T extends Set<infer M>
-  ? M
-  : unknown;
+type GetSetMemberType<T extends Set<any>> =
+  T extends Set<infer M> ? M : unknown;
 
-type UnparenthesizedPipeBodyTypes = GetSetMemberType<
+export type UnparenthesizedPipeBodyTypes = GetSetMemberType<
   typeof UnparenthesizedPipeBodyDescriptions
 >;
 
@@ -48,4 +48,4 @@ export default {
     "Topic reference was used in a lexical context without topic binding.",
   PrimaryTopicRequiresSmartPipeline:
     'Topic reference is used, but the pipelineOperator plugin was not passed a "proposal": "hack" or "smart" option.',
-};
+} satisfies ParseErrorTemplates;

@@ -6,17 +6,16 @@ export interface Options {
 }
 
 export default declare((api, { loose = false }: Options) => {
-  api.assertVersion(7);
+  api.assertVersion(REQUIRED_VERSION(7));
   const noDocumentAll = api.assumption("noDocumentAll") ?? loose;
 
   return {
     name: "transform-nullish-coalescing-operator",
-    inherits: USE_ESM
-      ? undefined
-      : IS_STANDALONE
-      ? undefined
-      : // eslint-disable-next-line no-restricted-globals
-        require("@babel/plugin-syntax-nullish-coalescing-operator").default,
+    inherits:
+      USE_ESM || IS_STANDALONE || api.version[0] === "8"
+        ? undefined
+        : // eslint-disable-next-line no-restricted-globals
+          require("@babel/plugin-syntax-nullish-coalescing-operator").default,
 
     visitor: {
       LogicalExpression(path) {

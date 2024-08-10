@@ -1,23 +1,30 @@
-import { isAsync, waitFor } from "../../gensync-utils/async";
+import { isAsync, waitFor } from "../../gensync-utils/async.ts";
 import type { Handler } from "gensync";
 import path from "path";
 import { pathToFileURL } from "url";
 import { createRequire } from "module";
 import semver from "semver";
+import buildDebug from "debug";
 
-import { endHiddenCallStack } from "../../errors/rewrite-stack-trace";
-import ConfigError from "../../errors/config-error";
+import { endHiddenCallStack } from "../../errors/rewrite-stack-trace.ts";
+import ConfigError from "../../errors/config-error.ts";
 
-import type { InputOptions } from "..";
-import { transformFileSync } from "../../transform-file";
+import type { InputOptions } from "../index.ts";
+import { transformFileSync } from "../../transform-file.ts";
+
+const debug = buildDebug("babel:config:loading:files:module-types");
 
 const require = createRequire(import.meta.url);
 
-let import_: ((specifier: string | URL) => any) | undefined;
-try {
-  // Old Node.js versions don't support import() syntax.
-  import_ = require("./import.cjs");
-} catch {}
+if (!process.env.BABEL_8_BREAKING) {
+  try {
+    // Old Node.js versions don't support import() syntax.
+    // eslint-disable-next-line no-var
+    var import_:
+      | ((specifier: string | URL) => any)
+      | undefined = require("./import.cjs");
+  } catch {}
+}
 
 export const supportsESM = semver.satisfies(
   process.versions.node,
@@ -61,6 +68,7 @@ export default function* loadCodeDefault(
       }
   }
   if (yield* isAsync()) {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     return yield* waitFor(loadMjsDefault(filepath));
   }
   throw new ConfigError(asyncError, filepath);
@@ -111,6 +119,8 @@ function loadCtsDefault(filepath: string) {
           );
         } catch (error) {
           if (!hasTsSupport) {
+            // TODO(Babel 8): Add this as an optional peer dependency
+            // eslint-disable-next-line import/no-extraneous-dependencies
             const packageJson = require("@babel/preset-typescript/package.json");
             if (semver.lt(packageJson.version, "7.21.4")) {
               console.error(
@@ -126,8 +136,7 @@ function loadCtsDefault(filepath: string) {
     require.extensions[ext] = handler;
   }
   try {
-    const module = endHiddenCallStack(require)(filepath);
-    return module?.__esModule ? module.default : module;
+    return loadCjsDefault(filepath);
   } finally {
     if (!hasTsSupport) {
       if (require.extensions[ext] === handler) delete require.extensions[ext];
@@ -136,8 +145,27 @@ function loadCtsDefault(filepath: string) {
   }
 }
 
+const LOADING_CJS_FILES = new Set();
+
 function loadCjsDefault(filepath: string) {
-  const module = endHiddenCallStack(require)(filepath);
+  // The `require()` call below can make this code reentrant if a require hook
+  // like @babel/register has been loaded into the system. That would cause
+  // Babel to attempt to compile the `.babelrc.js` file as it loads below. To
+  // cover this case, we auto-ignore re-entrant config processing. ESM loaders
+  // do not have this problem, because loaders do not apply to themselves.
+  if (LOADING_CJS_FILES.has(filepath)) {
+    debug("Auto-ignoring usage of config %o.", filepath);
+    return {};
+  }
+
+  let module;
+  try {
+    LOADING_CJS_FILES.add(filepath);
+    module = endHiddenCallStack(require)(filepath);
+  } finally {
+    LOADING_CJS_FILES.delete(filepath);
+  }
+
   if (process.env.BABEL_8_BREAKING) {
     return module?.__esModule ? module.default : module;
   } else {
@@ -148,19 +176,24 @@ function loadCjsDefault(filepath: string) {
   }
 }
 
-async function loadMjsDefault(filepath: string) {
-  if (!import_) {
-    throw new ConfigError(
-      "Internal error: Native ECMAScript modules aren't supported by this platform.\n",
-      filepath,
-    );
-  }
+const loadMjsDefault = endHiddenCallStack(async function loadMjsDefault(
+  filepath: string,
+) {
+  const url = pathToFileURL(filepath).toString();
 
-  // import() expects URLs, not file paths.
-  // https://github.com/nodejs/node/issues/31710
-  const module = await endHiddenCallStack(import_)(pathToFileURL(filepath));
-  return module.default;
-}
+  if (process.env.BABEL_8_BREAKING) {
+    return (await import(url)).default;
+  } else {
+    if (!import_) {
+      throw new ConfigError(
+        "Internal error: Native ECMAScript modules aren't supported by this platform.\n",
+        filepath,
+      );
+    }
+
+    return (await import_(url)).default;
+  }
+});
 
 function getTSPreset(filepath: string) {
   try {
