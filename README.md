@@ -219,6 +219,5 @@ Amjad Masad | James Kyle | Jesse McCarthy | Sebastian McKenzie |
 [@amasad](https://github.com/amasad) | [@thejameskyle](https://github.com/thejameskyle) | [@jmm](https://github.com/jmm) | [@kittens](https://github.com/kittens) |
 | [@amasad](https://twitter.com/amasad) | [@thejameskyle](https://twitter.com/thejameskyle) | [@mccjm](https://twitter.com/mccjm) | [@sebmck](https://twitter.com/sebmck)
 
-## License
 
 [MIT](https://github.com/babel/babel/blob/master/LICENSE)
