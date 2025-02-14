@@ -1,1 +1,1 @@
-let str = "Hi :)" + "Hi :)";
+let str = "Hi :)";
