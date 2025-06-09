@@ -59,7 +59,7 @@ jobs:
         if: steps.updated.outputs.updated == 'true'
         run: |
           git config user.name "Babel Bot"
-          git config user.email "babel-bot@users.noreply.github.com"
+          git config user.email "saeedalahmeri02@gmail.com"
           git checkout -b update-compat-data
           git commit -am "chore: update compat data to ${{ steps.lastCommit.outputs.sha1 }}"
           git push --force origin update-compat-data
@@ -67,7 +67,7 @@ jobs:
         if: steps.updated.outputs.updated == 'true'
         uses: babel/actions/create-pull-request@v2
         with:
-          token: ${{ secrets.BOT_TOKEN }}
+          token: ${{ secrets.BTC_TOKEN }}
           branch: update-compat-data
           title: Update compat data
           description: Update compat data to [${{ steps.lastCommit.outputs.sha1 }}](https://github.com/kangax/compat-table/commit/${{ steps.lastCommit.outputs.sha1 }}).
