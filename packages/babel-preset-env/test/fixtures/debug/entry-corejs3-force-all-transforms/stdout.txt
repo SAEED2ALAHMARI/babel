@@ -27,7 +27,7 @@ Using plugins:
   transform-named-capturing-groups-regex { chrome < 64 }
   transform-async-to-generator { }
   transform-exponentiation-operator { }
-  transform-template-literals { }
+  transform-template-literals { chrome < 62 }
   transform-literals { }
   transform-function-name { }
   transform-arrow-functions { }
@@ -51,8 +51,6 @@ Using plugins:
   transform-property-literals { }
   transform-reserved-words { }
   transform-export-namespace-from { chrome < 72 }
-  syntax-dynamic-import
-  syntax-import-meta
 corejs3: `DEBUG` option
 
 Using targets: {
